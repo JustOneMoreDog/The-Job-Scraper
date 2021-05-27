@@ -1,0 +1,47 @@
+# What we will search on LinkedIn
+searches:
+  - Cloud Security Engineer
+  - Network Security Engineer
+  - Offensive Security Engineer
+  - Red Team
+# How many jobs to scrape from each search
+max_jobs_per_search: 150
+# The exact match location
+location: Washington DC-Baltimore Area
+# Any locations that we want to exclude
+excluded_locations:
+  - Chantilly
+  - Springfield
+  - Vienna
+  - Fairfax
+# Words to look for in the job posting and how heavy their weight should be
+word_weights:
+  clearance: -50
+  government: -10
+  federal: -10
+  automation: 10
+  cloud: 10
+  GPEN: 10
+  OSCP: 10
+  eWAPT: 10
+  eLearn Security: 10
+  GIAC: 10
+  AWS CP: 10
+  kubernetes: 5
+  AWS Security: 10
+  Cloud Formation: 5
+  ansible: 5
+
+
+### DO NOT EDIT BELOW THIS LINE ###
+headless: false
+timeout: 10
+max_retries: 3
+xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]" #
+any_time_button: "//button[contains(text(), 'Any Time')]" #
+past_week_button: "//label[contains(text(), 'Past Week')]" #
+no_results: "//span[contains(@class, 'no-results__text')]" #
+job_results_selector: "jobs-search__results-list" #
+job_location: "job-search-card__location" #
+job_description:
+  class: "description__text"
