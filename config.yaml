@@ -3,6 +3,7 @@ searches:
   - Cloud Security Engineer
   - Network Security Engineer
   - Offensive Security Engineer
+  - Security Engineer
   - Red Team
 # How many jobs to scrape from each search
 max_jobs_per_search: 150
@@ -34,14 +35,14 @@ word_weights:
 
 
 ### DO NOT EDIT BELOW THIS LINE ###
-headless: false
+headless: true
 timeout: 10
 max_retries: 3
-xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]" #
-any_time_button: "//button[contains(text(), 'Any Time')]" #
-past_week_button: "//label[contains(text(), 'Past Week')]" #
-no_results: "//span[contains(@class, 'no-results__text')]" #
-job_results_selector: "jobs-search__results-list" #
-job_location: "job-search-card__location" #
+xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]"
+any_time_button: "//button[contains(text(), 'Any Time')]"
+past_week_button: "//label[contains(text(), 'Past Week')]"
+no_results: "//span[contains(@class, 'no-results__text')]"
+job_results_selector: "jobs-search__results-list"
+job_location: "job-search-card__location"
 job_description:
   class: "description__text"

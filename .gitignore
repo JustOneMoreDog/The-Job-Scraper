@@ -1,2 +1,6 @@
 # Project exclude paths
 /venv/
+/logs/
+/scrape_backups/
+/daily_reports/
+all_jobs.json

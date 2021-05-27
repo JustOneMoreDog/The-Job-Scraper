@@ -1,29 +1,26 @@
 from hed_utils.selenium import SharedDriver, chrome_driver, FindBy
-from hed_utils.support.text_tool import normalize_spacing
-from hed_utils.support.time_tool import localize, utc_moment
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 from datetime import datetime
-from urllib.parse import urljoin
-from typing import Dict, Any, List, Set
-from bs4 import Tag, BeautifulSoup
-from tabulate import tabulate
+from typing import Dict, Any
+from bs4 import BeautifulSoup
 import selenium.common.exceptions
 import time
-import csv
 import requests
 import logging
 import logging.handlers
 import json
 import os
-import re
 import yaml
 from xlsxwriter import Workbook
 
-# Setting up our log file
+# Setting up our log files
+if not os.path.exists("logs"):
+    os.mkdir("path")
+if not os.path.exists("scrape_backups"):
+    os.mkdir("scrape_backups")
+if not os.path.exists("daily_reports"):
+    os.mkdir("daily_reports")
 log_file_handler = logging.handlers.WatchedFileHandler(os.environ.get(
     "LOGFILE", os.path.join(os.getcwd(), "logs/" + str(datetime.today().date()) + ".log")
 ))
@@ -291,6 +288,7 @@ if __name__ == '__main__':
         job['rating'] = rating
     logging.info("Sorting the jobs by their rating")
     good_jobs.sort(key=lambda x: x['rating'], reverse=True)
+    bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
     logging.info("Adding newly found results to master list")
 
     save_json_data(all_jobs + good_jobs + bad_jobs, "all_jobs.json")
@@ -300,5 +298,4 @@ if __name__ == '__main__':
                       "rating": "", "keywords": "", "url": "", "content": ""})
     logging.info("Saving job report to excel file")
     save_job_report(good_jobs + bad_jobs)
-    #print(tabulate(good_jobs + bad_jobs, headers="keys", tablefmt="grid"))
     logging.info("Daily job scrape complete!")
