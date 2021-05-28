@@ -120,6 +120,8 @@ def get_job_posts(search: str, location: str, max_jobs: int, driver, config):
 
     lastHeight = 0
     known_tags = []
+    valid_job_postings = 0
+    complete_data = []
     # Handling the infinite scroll
     while True:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -152,23 +154,27 @@ def get_job_posts(search: str, location: str, max_jobs: int, driver, config):
         logging.info("(%s): %d new jobs found" % (search, len(new_tags)))
         known_tags.extend(new_tags)
         logging.info("(%s): %d total jobs found" % (search, len(known_tags)))
+        # We can pre-filter some of the jobs we found by checking if they are in cities we do not want
+        # This way we only stop our search once we have found X valid jobs
+        # Now that we have all the subsections of HTML code containing the job posting, we can parse it to get the
+        # information we need (ex. posted time, company, location, and job title)
+        parsed_tags = [parse(tag, config) for tag in known_tags]
+        for t in parsed_tags:
+            if t["location"]:
+                t["location"] = (str(t['location']).split(", United States"))[0]
+            if len(t["title"]) > 35:
+                t["title"] = str(t["title"])[:35] + "..."
+            if not any(l for l in config['excluded_locations'] if l.lower() in job['location'].lower()) and \
+                    not any(c for c in config['excluded_companies'] if c.lower() in job['company'].lower()):
+                valid_job_postings += 1
+        complete_data.extend(parsed_tags)
         # The max jobs per search is more of a, stop after this point, kind of deal
-        if len(known_tags) >= max_jobs:
+        if valid_job_postings >= max_jobs:
             logging.info("(%s): Found more than or equal to max number jobs. Breaking out" % search)
             break
         lastHeight = newHeight
 
-    # Now that we have all the subsections of HTML code containing the job posting, we can parse it to get the
-    # information we need (ex. posted time, company, location, and job title)
-    parsed_tags = [parse(tag, config) for tag in known_tags]
-    sorted_data = sorted(parsed_tags, key=lambda k: k['title'])
-    for t in sorted_data:
-        if t["location"]:
-            t["location"] = (str(t['location']).split(", United States"))[0]
-        if len(t["title"]) > 35:
-            t["title"] = str(t["title"])[:35] + "..."
-
-    return sorted_data
+    return complete_data
 
 
 def post_job_scrape_processing(new_data, old_data):
