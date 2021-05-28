@@ -6,7 +6,7 @@ searches:
   - Security Engineer
   - Red Team
 # How many jobs to scrape from each search
-max_jobs_per_search: 150
+max_jobs_per_search: 50
 # The exact match location
 location: Washington DC-Baltimore Area
 # Any locations that we want to exclude
@@ -15,11 +15,17 @@ excluded_locations:
   - Springfield
   - Vienna
   - Fairfax
+  - Herndon
+# Any companies that we want to exclude
+excluded_companies:
+  - ClearanceJobs
+  - ClearedJobs.Net
 # Words to look for in the job posting and how heavy their weight should be
 word_weights:
   clearance: -50
   government: -10
   federal: -10
+  travel: -10
   automation: 10
   cloud: 10
   GPEN: 10

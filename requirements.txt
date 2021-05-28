@@ -11,12 +11,10 @@ httplib2==0.19.1
 idna==2.10
 jdcal==1.4.1
 lxml==4.5.0
-numpy==1.20.3
 oauth2client==4.1.3
 oauthlib==3.1.0
 openpyxl==3.0.3
 pathvalidate==2.2.0
-pkg-resources==0.0.0
 psutil==5.7.0
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
@@ -26,7 +24,6 @@ PyYAML==5.4.1
 requests==2.23.0
 requests-oauthlib==1.3.0
 rsa==4.7.2
-scrape-jobs==3.0.2
 selenium==3.141.0
 six==1.16.0
 soupsieve==2.2.1
