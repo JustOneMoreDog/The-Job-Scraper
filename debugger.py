@@ -58,11 +58,13 @@ def parse(tag, config) -> Dict[str, Any]:
     return job
 
 
-config = load_yaml_data("config.yaml")
+config = {**load_yaml_data("config.yaml"), **load_yaml_data("customizations.yaml")}
 searches = config['searches']
 location = config['location']
 max_jobs = config['max_jobs_per_search']
 excluded_locations = config['excluded_locations']
+excluded_companies = config['excluded_companies']
+excluded_title_keywords = config['excluded_title_keywords']
 word_weights = config['word_weights']
 driver = chrome_driver.create_instance(headless=False)
 driver.set_page_load_timeout(config['timeout'])
@@ -96,11 +98,39 @@ time.sleep(.5)
 send_tab_enter(driver.find_elements_by_xpath(config['past_week_button'])[0])
 wait_and_sleep(SharedDriver())
 
+# Limiting our search to full time positions
+driver.find_elements_by_xpath(config['job_type_button'])[0].click()
+driver.find_elements_by_xpath(config['full_time_button'])[0].click()
+time.sleep(.5)
+for b in driver.find_elements_by_xpath(config['done_button']):
+    if "done" in b.text.lower():
+        b.click()
+        break
+wait_and_sleep(SharedDriver())
+
+# Limiting our Experience level to only certain levels
+driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
+time.sleep(.25)
+driver.find_elements_by_xpath(config['exp_level_button'])[0].click()
+time.sleep(.25)
+for job_level in driver.find_elements_by_xpath(config['ul_li_filter_list']):
+    if any(x for x in [y for y in config['experience_levels'].keys() if config['experience_levels'][y]] if
+           x.lower() in job_level.text.lower()):
+        job_level.click()
+time.sleep(.25)
+for b in driver.find_elements_by_xpath(config['done_button']):
+    if "done" in b.text.lower():
+        b.click()
+        break
+wait_and_sleep(SharedDriver())
+
 if FindBy.XPATH(config['no_results']).is_present():
     print("No results found for the keyword: %s" % search)
 else:
     lastHeight = 0
     known_tags = []
+    valid_job_postings = 0
+    complete_data = []
     no_jobs_found = False
     while True:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -134,8 +164,21 @@ else:
         print("(%s): %d new jobs found" % (search, len(new_tags)))
         known_tags.extend(new_tags)
         print("(%s): %d total jobs found" % (search, len(known_tags)))
+        # We can pre-filter some of the jobs we found by checking if they are in cities we do not want
+        # This way we only stop our search once we have found X valid jobs
+        # Now that we have all the subsections of HTML code containing the job posting, we can parse it to get the
+        # information we need (ex. posted time, company, location, and job title)
+        parsed_tags = [parse(tag, config) for tag in known_tags]
+        for j in parsed_tags:
+            if j["location"]:
+                j["location"] = (str(j['location']).split(", United States"))[0]
+            if not any(l for l in config['excluded_locations'] if l.lower() in j['location'].lower()) and \
+                    not any(l for l in config['excluded_companies'] if l.lower() in j['company'].lower()) and \
+                    not any(l for l in config['excluded_title_keywords'] if l.lower() in j['title'].lower()):
+                valid_job_postings += 1
+        complete_data.extend(parsed_tags)
         # The max jobs per search is more of a, stop after this point, kind of deal
-        if len(known_tags) >= max_jobs:
+        if valid_job_postings >= max_jobs:
             print("(%s): Found more than or equal to max number jobs. Breaking out" % search)
             break
         lastHeight = newHeight
@@ -144,11 +187,6 @@ else:
         # information we need (ex. posted time, company, location, and job title)
         parsed_tags = [parse(tag, config) for tag in known_tags]
         sorted_data = sorted(parsed_tags, key=lambda k: k['title'])
-        for t in sorted_data:
-            if t["location"]:
-                t["location"] = (str(t['location']).split(", United States"))[0]
-            if len(t["title"]) > 35:
-                t["title"] = str(t["title"])[:35] + "..."
         # Now we print out our results
         print(tabulate(sorted_data, headers="keys", tablefmt="grid"))
     else:
