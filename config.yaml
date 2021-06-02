@@ -2,10 +2,12 @@
 headless: false
 timeout: 10
 max_retries: 3
+window_size: "1920,1080"
 xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]"
 any_time_button: "//button[contains(text(), 'Any Time')]"
 past_week_button: "//label[contains(text(), 'Past Week')]"
 job_type_button: "//button[contains(text(), 'Job Type')]"
+job_type_nested_button: "//button/span[contains(text(), 'Job Type')]"
 full_time_button: "//label[contains(text(), 'Full-time')]"
 done_button: "//button[contains(text(), 'Done')]"
 more_filters_button: "//button[contains(text(), 'More Filters')]"

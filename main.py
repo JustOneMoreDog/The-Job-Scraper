@@ -3,6 +3,7 @@ from hed_utils.selenium import SharedDriver, chrome_driver, FindBy
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from typing import Dict, Any
 from bs4 import BeautifulSoup
@@ -15,6 +16,9 @@ import json
 import os
 import yaml
 from xlsxwriter import Workbook
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+
 
 # Setting up our log files
 if not os.path.exists("logs"):
@@ -105,11 +109,21 @@ def get_job_content(url, driver, shared_driver, config):
                 continue
 
 
+# This will check if we are getting dickled and LinkedIn redirected us to a login page
+def validate_page(driver):
+    parsed = urlparse.urlparse(driver.current_url)
+    if 'session_redirect' in parse_qs(parsed.query):
+        logging.warning("LinkedIn redirected us and so we need to sleep for a few seconds and then redo the search")
+        time.sleep(3)
+        driver.get(str(parse_qs(parsed.query)['session_redirect'][0]))
+
+
 def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
 
     # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
     def wait_and_sleep(shared_driver):
         shared_driver.wait_for_page_load()
+        validate_page(driver)
         time.sleep(.75)
 
     # Inner function that will move to an element and then press tab and then enter
@@ -125,6 +139,7 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
         logging.info("(%s): starting job hunt for %s in %s" % (search, search, location))
 
         driver.get('https://www.linkedin.com/jobs')
+        print(driver.get_window_size())
         SharedDriver().wait_for_page_load()
         wait_and_sleep(SharedDriver())
 
@@ -149,7 +164,11 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
         wait_and_sleep(SharedDriver())
 
         # Limiting our search to full time positions
-        driver.find_elements_by_xpath(config['job_type_button'])[0].click()
+        if driver.find_elements_by_xpath(config['job_type_button']):
+            driver.find_elements_by_xpath(config['job_type_button'])[0].click()
+        else:
+            driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
+            driver.find_element_by_xpath(config['job_type_nested_button']).click()
         driver.find_elements_by_xpath(config['full_time_button'])[0].click()
         time.sleep(.5)
         for b in driver.find_elements_by_xpath(config['done_button']):
@@ -232,7 +251,7 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
                         not any(l for l in config['excluded_title_keywords'] if l.lower() in j['title'].lower()):
                     valid_job_postings += 1
             complete_data.extend(parsed_tags)
-            logging.info("(%s): %d total valid jobs found" % (search, len(valid_job_postings)))
+            logging.info("(%s): %d total valid jobs found" % (search, valid_job_postings))
             # The max jobs per search is more of a, stop after this point, kind of deal
             if valid_job_postings >= max_jobs:
                 logging.info("(%s): Found more than or equal to max number jobs (%d). Breaking out" %
@@ -370,16 +389,38 @@ if __name__ == '__main__':
     excluded_title_keywords = config['excluded_title_keywords']
     word_weights = config['word_weights']
 
-    driver = chrome_driver.create_instance(headless=config['headless'])
+    # We are statically defining that the chrome window be 1920x1080 so that we can have consistency
+    # If we always know that the window will X by Y size, then we will have an easier time finding the
+    # elements we are looking for. We still put in the try catch to help catch the edge cases that we cannot predict
+    options = Options()
+    if config['headless']:
+        options.add_argument("--headless")
+    options.add_argument("window-size=%s" % config['window_size'])
+    driver = webdriver.Chrome(options=options)
+    #driver = chrome_driver.create_instance(headless=config['headless'])
     driver.set_page_load_timeout(config['timeout'])
     logging.info("Loading previously found jobs")
     all_jobs = load_json_data("all_jobs.json") or []
+    save_json_data(all_jobs, "all_jobs.json.old")
     data = []
     logging.info("Scraping LinkedIn for jobs")
 
     for search in searches:
         logging.info("Scraping LinkedIn for jobs with the keyword %s" % search)
-        data.append(get_job_posts(search=search, locations=locations, max_jobs=max_jobs, driver=driver, config=config))
+        i = config['max_retries']
+        while i != 0:
+            try:
+                scraped_job_posts = get_job_posts(
+                    search=search, locations=locations, max_jobs=max_jobs, driver=driver, config=config
+                )
+                data.append(scraped_job_posts)
+                break
+            except Exception as e:
+                logging.warning("There was an error with getting jobs for '%s'" % search)
+                logging.warning(e)
+                logging.warning("We are going to sleep for 5 and then retry. We have %d tries left" % (i-1))
+                time.sleep(5)
+                i -= 1
     logging.info("Done scraping LinkedIn for jobs")
     processed_data = post_job_scrape_processing(data, all_jobs)
     logging.info("We previously had %d jobs found" % len(all_jobs))
@@ -433,6 +474,7 @@ if __name__ == '__main__':
     bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
     logging.info("Adding newly found results to master list")
 
+    # This should probably be changed to all_jobs + processed_data
     save_json_data(all_jobs + good_jobs + bad_jobs, "all_jobs.json")
     for i in range(1, 5):
         good_jobs.append(blank_job)
