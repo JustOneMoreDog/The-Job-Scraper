@@ -11,7 +11,7 @@ searches:
   - Site Reliability Engineer
   - GIAC Cloud Security Automation
 # How many jobs to scrape from each search
-max_jobs_per_search: 200
+max_jobs_per_search: 100
 # The exact match location
 locations:
   - Washington DC-Baltimore Area
@@ -41,11 +41,18 @@ excluded_locations:
   - "Woodbridge"
   - "Franconia"
   - "Waldorf"
+  - "Gaithersburg"
+  - "Merrifield"
+  - "Columbia"
+  - "Catonsville"
+  - "Seven Corners"
+  - "Bethesda"
 # Any companies that we want to exclude
 excluded_companies:
   - ClearanceJobs
   - ClearedJobs.Net
   - Leidos
+  - Epic
 # If a job title contains a keyword that we do not want ex. Senior
 excluded_title_keywords:
   - Senior

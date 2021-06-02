@@ -4,3 +4,5 @@
 /scrape_backups/
 /daily_reports/
 all_jobs.json
+all_jobs.json.old
+customizations.yaml

@@ -1,0 +1,32 @@
+# What we will search on LinkedIn
+searches:
+  - Security Engineer
+# How many jobs to scrape from each search
+max_jobs_per_search: 100
+# The exact match location
+locations:
+  - Washington DC-Baltimore Area
+# Experience level we want to search for
+experience_levels:
+  Internship: false
+  Entry level: true
+  Associate: true
+  Mid-Senior level: false
+  Director: false
+# Any locations that we want to exclude.
+excluded_locations:
+  - "Chantilly"
+# Any companies that we want to exclude
+excluded_companies:
+  - ClearanceJobs
+# If a job title contains a keyword that we do not want ex. Senior
+excluded_title_keywords:
+  - Manager
+# Words to look for in the job posting and how heavy their weight should be
+word_weights:
+  clearance: -50
+  travel: -10
+  AWS Security: 20
+  GIAC: 10
+  kubernetes: 5
+  ansible: 5
