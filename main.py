@@ -1,4 +1,3 @@
-import string
 from hed_utils.selenium import SharedDriver, chrome_driver, FindBy
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
@@ -7,17 +6,18 @@ from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from typing import Dict, Any
 from bs4 import BeautifulSoup
+from tabulate import tabulate
+from xlsxwriter import Workbook
+from urllib.parse import parse_qs
+from functools import reduce
 import selenium.common.exceptions
 import time
-import requests
 import logging
 import logging.handlers
 import json
 import os
 import yaml
-from xlsxwriter import Workbook
 import urllib.parse as urlparse
-from urllib.parse import parse_qs
 
 
 # Setting up our log files
@@ -77,33 +77,31 @@ def get_job_content(url, driver, shared_driver, config):
     while True:
         driver.get(url)
         shared_driver.wait_for_page_load()
-        time.sleep(.75)
+        time.sleep(1)
         if not http_429_error_check(driver):
             break
         retries -= 1
         if retries == 0:
-            return ''
+            return BeautifulSoup()
     retries = config['max_retries']
     while True:
         if retries != config['max_retries']:
             driver.get(url)
             shared_driver.wait_for_page_load()
-            time.sleep(.75)
+            time.sleep(1)
         try:
             for b in driver.find_elements_by_xpath(config['job_description_show_more']):
                 if b.text == 'Show more':
                     b.click()
                     break
-            time.sleep(.75)
-            job_description = driver.find_elements_by_xpath(config['job_description_xpath'])
-            if job_description and len(job_description) > 0:
-                return job_description[0].text
-            else:
-                return ''
+            time.sleep(1)
+            soup = shared_driver.page_soup
+            job_description = soup.find(config['job_description_tag'], class_=config['job_description_class'])
+            return BeautifulSoup(str(job_description), 'html.parser')
         except: # Dont @ me
             retries -= 1
             if retries == 0:
-                return ''
+                return BeautifulSoup()
             else:
                 time.sleep(1)
                 continue
@@ -118,13 +116,13 @@ def validate_page(driver):
         driver.get(str(parse_qs(parsed.query)['session_redirect'][0]))
 
 
-def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
+def get_job_posts(search: str, locations: list, max_jobs_per_location: int, driver, config):
 
     # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
     def wait_and_sleep(shared_driver):
         shared_driver.wait_for_page_load()
         validate_page(driver)
-        time.sleep(.75)
+        time.sleep(1)
 
     # Inner function that will move to an element and then press tab and then enter
     def send_tab_enter(e):
@@ -132,14 +130,14 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
 
     SharedDriver.set_instance(driver)
     known_tags = []
-    valid_job_postings = 0
+    total_valid_job_postings = 0
     complete_data = []
     # Still need to add the radius selector
     for location in locations:
+        valid_job_postings = 0
         logging.info("(%s): starting job hunt for %s in %s" % (search, search, location))
 
         driver.get('https://www.linkedin.com/jobs')
-        print(driver.get_window_size())
         SharedDriver().wait_for_page_load()
         wait_and_sleep(SharedDriver())
 
@@ -158,10 +156,14 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
 
         # Limiting our search results to the past week
         driver.find_elements_by_xpath(config['any_time_button'])[0].click()
-        driver.find_elements_by_xpath(config['past_week_button'])[0].click()
-        time.sleep(.5)
-        send_tab_enter(driver.find_elements_by_xpath(config['past_week_button'])[0])
+        driver.find_elements_by_xpath(config['past_day_button'])[0].click()
+        time.sleep(1)
+        send_tab_enter(driver.find_elements_by_xpath(config['past_day_button'])[0])
         wait_and_sleep(SharedDriver())
+
+        if FindBy.XPATH(config['no_results']).is_present():
+            logging.warning("No results found for the keyword: %s" % search)
+            continue
 
         # Limiting our search to full time positions
         if driver.find_elements_by_xpath(config['job_type_button']):
@@ -170,12 +172,16 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
             driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
             driver.find_element_by_xpath(config['job_type_nested_button']).click()
         driver.find_elements_by_xpath(config['full_time_button'])[0].click()
-        time.sleep(.5)
+        time.sleep(1)
         for b in driver.find_elements_by_xpath(config['done_button']):
             if "done" in b.text.lower():
                 b.click()
                 break
         wait_and_sleep(SharedDriver())
+
+        if FindBy.XPATH(config['no_results']).is_present():
+            logging.warning("No results found for the keyword: %s" % search)
+            continue
 
         # Limiting our Experience level to only certain levels
         if driver.find_elements_by_xpath(config['more_filters_button']):
@@ -194,7 +200,7 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
                 if any(x for x in [y for y in config['experience_levels'].keys() if config['experience_levels'][y]] if
                        x.lower() in job_level.text.lower()):
                     job_level.click()
-        time.sleep(.25)
+        time.sleep(.5)
         for b in driver.find_elements_by_xpath(config['done_button']):
             if "done" in b.text.lower():
                 b.click()
@@ -203,7 +209,7 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
 
         if FindBy.XPATH(config['no_results']).is_present():
             logging.warning("No results found for the keyword: %s" % search)
-            return []
+            continue
 
         last_height = 0
         # Handling the infinite scroll
@@ -260,7 +266,10 @@ def get_job_posts(search: str, locations: list, max_jobs: int, driver, config):
             else:
                 logging.info("(%s): We are now at %d valid job postings" % (search, valid_job_postings))
             last_height = newHeight
-
+        logging.info("(%s): finished job hunt for %s in %s and got %d valid jobs" %
+                     (search, search, location, valid_job_postings))
+        total_valid_job_postings += valid_job_postings
+    logging.info("(%s): Finished scraping jobs and returning %d valid jobs" % (search, total_valid_job_postings))
     return complete_data
 
 
@@ -283,7 +292,16 @@ def load_json_data(filepath) -> dict:
 
 def save_json_data(data, filepath):
     with open(filepath, "w") as f:
-        return json.dump(data, f)
+        return json.dump(obj=data, fp=f, cls=BSEncoder)
+
+
+# This allows us to export the jobs as json by telling json.dump how to serial the beautiful soup content object
+class BSEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, BeautifulSoup):
+            return str(o)
+        else:
+            return o.__dict__
 
 
 def load_yaml_data(filepath) -> dict:
@@ -291,7 +309,7 @@ def load_yaml_data(filepath) -> dict:
         return yaml.load(f, Loader=yaml.FullLoader)
 
 
-def save_job_report(jobs):
+def save_job_report_excel(jobs):
     headers = ["posted_time", "title", "company", "location", "rating", "keywords", "url"]
     path = os.path.join(os.getcwd(), "daily_reports", str(datetime.today().date()) + ".xlsx")
     wb = Workbook(path)
@@ -306,13 +324,10 @@ def save_job_report(jobs):
 # If you want the data to go somewhere else other than an excel file you can use this function
 # For me I have it go to my var www folder so that I can just access it from the browser
 # extra_steps(good_jobs+bad_jobs)
-def extra_steps(data):
-    from tabulate import tabulate
-    import re
-    import random
-    import string
+def save_job_report_html(data, path):
     keys = ["posted_time", "title", "company", "location", "rating", "keywords", "url", "content"]
-    path = "/var/www/desktopdev/%s" % (str(datetime.today().date()))
+    index_path = os.path.join(path, "index.html")
+    # Our extremely basic HTML page
     html = """
     <html>
     <head>
@@ -325,47 +340,62 @@ def extra_steps(data):
     </body>
     </html>
     """
-    os.mkdir(path)
-    with open("/var/www/desktopdev/index.html", "r") as f:
+    # Adding an <a> tag that links to the job report
+    with open(index_path, "r") as f:
         soup = BeautifulSoup(f, "html.parser")
         p = "/" + str(datetime.today().date()) + "/index.html"
         new_tag = soup.new_tag('a', href=p)
         new_tag.string = str(datetime.today().date())
         soup.body.append(soup.new_tag('br'))
         soup.body.append(new_tag)
-    with open("/var/www/desktopdev/index.html", "w") as f:
+    # Saving the new index.html file
+    with open(index_path, "w") as f:
         f.write(str(soup))
+    path = os.path.join(path, (str(datetime.today().date())))
+    index_path = os.path.join(path, "index.html")
+    # Making sure the HTML path exists
+    if not os.path.exists(path):
+        os.mkdir(path)
+    # Making sure that there is an index.html in the HTML path and if not we make one
+    if not os.path.exists(index_path):
+        with open(index_path, "w") as f:
+            soup = BeautifulSoup(html, "html.parser")
+            f.write(str(soup))
+    # Creating our job report table using tabulate
     with open(os.path.join(path, "index.html"), "w") as f:
-        regex = re.compile('[^a-zA-Z]')
+        # We want our data to be in a certain order
         ordered_data = [{k: d[k] for k in keys} for d in data]
         for d in ordered_data:
+            # Rather than having the content in the table, we make a different html page for it
+            # This ensures that the table looks clean and is easy to read
+            # We do not always need the content anyways
             if d['content']:
-                #content_folder = str(d['posted_time'] + "-" +
-                #                     regex.sub('', str(d['title'])[:15]).replace(" ", "_") + "_" +
-                #                     str(d['company']).split(".")[0].replace(" ", "-")).lower() + \
-                #                 ''.join(random.choices(string.ascii_lowercase, k=3))
+                # Since each job posting that we scrape is deemed unique by their url, and since each url will start
+                # the same, then the last section of the url is guaranteed to be unique. This ensures that we do not
+                # create a folder for a job posting that overwrites another job posting
                 content_folder = d['url'].split("/")[-1]
                 os.mkdir(os.path.join(path, content_folder))
                 content_path = os.path.join(content_folder, "content.html")
                 soup = BeautifulSoup(html, "html.parser")
-                new_tag = soup.new_tag('p')
-                new_tag.string = d['content']
-                soup.body.append(new_tag)
-                with open(os.path.join(path, content_path), "w") as g:
-                    g.write(str(soup))
-                a_tag = soup.new_tag('a', href=content_path)
+                #new_tag = soup.new_tag('p')
+                #new_tag.string = d['content']
+                soup.body.append(d['content'])
+                # Writing the content to its own file
+                with open(os.path.join(path, content_path), "w", encoding='utf-8-sig') as g:
+                    g.write(str(soup.prettify()))
+                # This makes it so that it opens up in a new tab
+                a_tag = soup.new_tag('a', href=content_path, target="_blank", rel="noopener noreferrer")
                 a_tag.string = "Content"
                 d['content'] = a_tag
-            post_link = soup.new_tag('a', href=d['url'])
+            post_link = soup.new_tag('a', href=d['url'], target="_blank", rel="noopener noreferrer")
             post_link.string = "Job Posting"
             d['url'] = post_link
+        # Creating the table
         index_page = BeautifulSoup(html, "html.parser")
         data_table = BeautifulSoup(tabulate(ordered_data, headers="keys", tablefmt="html"), "html.parser")
         index_page.body.append(data_table)
-
+        # Saving the table
         f.write(str(index_page))
-
-    return None
 
 
 if __name__ == '__main__':
@@ -379,11 +409,20 @@ if __name__ == '__main__':
     # If this is the first run then we will need to generate a all_jobs.json file
     if not os.path.exists("all_jobs.json"):
         save_json_data([], "all_jobs.json")
+    # Checking if the user wants us to output html and if so making sure the folder exists
+    if 'save_to_html' in config and config['save_to_html']:
+        html_path = config['html_folder']
+        if not os.path.exists(html_path):
+            os.mkdir(html_path)
+    else:
+        html_path = None
 
     # Loading user defined customizations
+    p_time = int(time.time())
+    processing_time = 0
     searches = config['searches']
     locations = config['locations']
-    max_jobs = config['max_jobs_per_search']
+    max_jobs = config['max_jobs_per_search_location']
     excluded_locations = config['excluded_locations']
     excluded_companies = config['excluded_companies']
     excluded_title_keywords = config['excluded_title_keywords']
@@ -392,12 +431,12 @@ if __name__ == '__main__':
     # We are statically defining that the chrome window be 1920x1080 so that we can have consistency
     # If we always know that the window will X by Y size, then we will have an easier time finding the
     # elements we are looking for. We still put in the try catch to help catch the edge cases that we cannot predict
+
     options = Options()
     if config['headless']:
         options.add_argument("--headless")
     options.add_argument("window-size=%s" % config['window_size'])
     driver = webdriver.Chrome(options=options)
-    #driver = chrome_driver.create_instance(headless=config['headless'])
     driver.set_page_load_timeout(config['timeout'])
     logging.info("Loading previously found jobs")
     all_jobs = load_json_data("all_jobs.json") or []
@@ -405,13 +444,15 @@ if __name__ == '__main__':
     data = []
     logging.info("Scraping LinkedIn for jobs")
 
+    processing_time += int(time.time()) - p_time
+    start_scrape = int(time.time())
     for search in searches:
         logging.info("Scraping LinkedIn for jobs with the keyword %s" % search)
         i = config['max_retries']
         while i != 0:
             try:
                 scraped_job_posts = get_job_posts(
-                    search=search, locations=locations, max_jobs=max_jobs, driver=driver, config=config
+                    search=search, locations=locations, max_jobs_per_location=max_jobs, driver=driver, config=config
                 )
                 data.append(scraped_job_posts)
                 break
@@ -421,27 +462,30 @@ if __name__ == '__main__':
                 logging.warning("We are going to sleep for 5 and then retry. We have %d tries left" % (i-1))
                 time.sleep(5)
                 i -= 1
-    logging.info("Done scraping LinkedIn for jobs")
+    logging.info("Done scraping LinkedIn for new jobs")
+    p_time = int(time.time())
     processed_data = post_job_scrape_processing(data, all_jobs)
-    logging.info("We previously had %d jobs found" % len(all_jobs))
-    logging.info("We scraped %d new jobs from LinkedIn" % len(processed_data))
+    processing_time += int(time.time()) - p_time
     logging.info("Backing up the scrape")
     save_json_data(processed_data, "scrape_backups/" + str(datetime.today().date()) + ".json")
+    end_scrape = int(time.time())
     driver.close()
+    time.sleep(3)
 
     logging.info("Getting content for jobs")
     start_content = int(time.time())
-    options = webdriver.ChromeOptions()
+    options = Options()
+    if config['headless']:
+        options.add_argument("--headless")
+    options.add_argument("window-size=%s" % config['window_size'])
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
-    options.headless = config['headless']
     driver = webdriver.Chrome(options=options)
     SharedDriver.set_instance(driver)
     for job in processed_data:
         logging.info("Parsing %s" % job['url'])
         job['content'] = get_job_content(job['url'], driver, SharedDriver(), config)
     end_content = int(time.time())
-    logging.info("It took us %d seconds to get all the job posting content" % (end_content-start_content))
-
+    p_time = int(time.time())
     logging.info("Organizing results")
     blank_job = {"posted_time": "", "location": "", "title": "", "company": "",
                  "rating": "", "keywords": "", "url": "", "content": ""}
@@ -460,7 +504,7 @@ if __name__ == '__main__':
             rating = -999
         else:
             for word in list(word_weights.keys()):
-                if word.lower() in job['content'].lower():
+                if word.lower() in str(job['content']).lower():
                     keywords.append(word)
                     rating += word_weights[word]
         job['keywords'] = ','.join(keywords)
@@ -474,13 +518,34 @@ if __name__ == '__main__':
     bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
     logging.info("Adding newly found results to master list")
 
-    # This should probably be changed to all_jobs + processed_data
     save_json_data(all_jobs + good_jobs + bad_jobs, "all_jobs.json")
+    logging.info("Formatting job report for output")
     for i in range(1, 5):
         good_jobs.append(blank_job)
     good_jobs.append({"posted_time": "Excluded Jobs", "location": "", "title": "", "company": "",
                       "rating": "", "keywords": "", "url": "", "content": ""})
     logging.info("Saving job report to excel file")
-    save_job_report(good_jobs + bad_jobs)
+    save_job_report_excel(good_jobs + bad_jobs)
+    if html_path:
+        logging.info("Saving job report to html file")
+        save_job_report_html((good_jobs + bad_jobs), html_path)
+    processing_time += int(time.time()) - p_time
+
+    # Doing this as an inner function to keep it simple
+    def post_script_report(write):
+        write("We previously had %d jobs found" % len(all_jobs))
+        total_scrape = reduce(lambda count, l: count + len(l), data, 0)
+        write("Today we scraped %d jobs from LinkedIn" % total_scrape)
+        write("It took us %d seconds to do the scrape, %d seconds to get content, and %d seconds to process the data" %
+              ((end_scrape - start_scrape), (end_content - start_content), processing_time))
+        write("%d of the %d scraped jobs are new" % (len(processed_data), total_scrape))
+        write("Out of those new jobs, %d were good and %d were undesirable.\nIn total we have scraped %d jobs to date." %
+              (len(good_jobs), len(bad_jobs), len(all_jobs + good_jobs + bad_jobs))
+              )
+    if config['post_script_console_report']:
+        post_script_report(print)
+        post_script_report(logging.info)
+    else:
+        post_script_report(logging.info)
     logging.info("Daily job scrape complete!")
-    extra_steps(good_jobs + bad_jobs)
+    driver.close()
