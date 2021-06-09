@@ -2,7 +2,7 @@
 searches:
   - Security Engineer
 # How many jobs to scrape from each location for each search
-max_jobs_per_search_location: 200
+minimum_jobs_per_search: 200
 # The exact match location
 locations:
   - Washington DC-Baltimore Area
