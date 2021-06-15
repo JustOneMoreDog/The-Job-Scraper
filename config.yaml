@@ -1,11 +1,13 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
-headless: false
+headless: true
 timeout: 10
 max_retries: 3
+scrape_all_last_day_jobs: true
 window_size: "1920,1080"
-post_script_console_report: true
+post_script_console_report: false
 xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]"
 any_time_button: "//button[contains(text(), 'Any Time')]"
+past_month_button: "//label[contains(text(), 'Past Month')]"
 past_week_button: "//label[contains(text(), 'Past Week')]"
 past_day_button: "//label[contains(text(), 'Past 24 hours')]"
 job_type_button: "//button[contains(text(), 'Job Type')]"
