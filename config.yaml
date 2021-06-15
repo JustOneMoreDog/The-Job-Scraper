@@ -2,6 +2,7 @@
 headless: true
 timeout: 10
 max_retries: 3
+scrape_all_last_day_jobs: true
 window_size: "1920,1080"
 post_script_console_report: false
 xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]"

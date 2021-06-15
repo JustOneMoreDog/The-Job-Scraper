@@ -279,13 +279,23 @@ def get_job_posts(search: str, locations: list, minimum_threshold: int, driver, 
                 # The min jobs per search is more of a, stop after this point, kind of deal
                 # Since scraping jobs for the past week or month can be intensive we will break out as soon as we
                 # hit our threshold instead continuing down the endless postings
-                if (week or month) and total_valid_job_postings >= minimum_threshold:
+                # In config.yaml a user can force the script to get all jobs in the last 24 hours
+                # By default this is turned off as it drastically increases the scrape time
+                if day and config['scrape_all_last_day_jobs']:
+                    last_height = newHeight
+                    continue
+                # Otherwise we will check if we have enough postings
+                elif total_valid_job_postings >= minimum_threshold:
                     logging.info("(%s): %d is over our threshold so we can break out now" %
                                  (search, total_valid_job_postings))
                     break
+                # If we do not have enough then we will continue
+                else:
+                    last_height = newHeight
+                    logging.info("(%s): We are now at %d valid job postings" % (search, total_valid_job_postings))
                 #else:
                 #    logging.info("(%s): We are now at %d valid job postings" % (search, valid_job_postings))
-                last_height = newHeight
+                #last_height = newHeight
             logging.info("(%s): finished job hunt in %s and are now at %d valid jobs" %
                          (search, location, total_valid_job_postings))
             # total_valid_job_postings += valid_job_postings
@@ -327,13 +337,26 @@ def is_a_valid_job_posting(j, config):
 
 def post_job_scrape_processing(new_data, old_data):
     deduped_data = []
+    scrape_dups = 0
+    previously_found = 0
+    scrape_duds = 0
     for job_search in new_data:
         for job in job_search:
             if 'url' in job and job['url']:
-                if not any(j for j in deduped_data if j['url'] == job['url']) and \
-                        not any(j for j in old_data if j['url'] == job['url']):
+                # Sometimes we can scrape a job twice because two searches may overlap
+                if any(j for j in deduped_data if j['url'].lower() == job['url'].lower()):
+                    scrape_dups += 1
+                # Sometimes a job shows up that we have already previously found
+                elif any(j for j in old_data if j['url'].lower() == job['url'].lower()):
+                    previously_found += 1
+                else:
                     deduped_data.append(job)
-    return deduped_data
+                #if not any(j for j in deduped_data if j['url'] == job['url']) and \
+                #        not any(j for j in old_data if j['url'] == job['url']):
+                #    deduped_data.append(job)
+            else:
+                scrape_duds += 1
+    return deduped_data, scrape_dups, previously_found, scrape_duds
 
 
 def load_json_data(filepath) -> dict:
@@ -499,6 +522,7 @@ if __name__ == '__main__':
     processing_time += int(time.time()) - p_time
     start_scrape = int(time.time())
     for search in searches:
+        search_start_time = int(time.time())
         logging.info("Scraping LinkedIn for jobs with the keyword %s" % search)
         i = config['max_retries']
         while i != 0:
@@ -515,9 +539,12 @@ if __name__ == '__main__':
                 logging.warning("We are going to sleep for 5 and then retry. We have %d tries left" % (i-1))
                 time.sleep(5)
                 i -= 1
+        search_stop_time = int(time.time())
+        search_time = search_stop_time - search_start_time
+        logging.info("(%s): Scrape took us %d seconds" % (search, search_time))
     logging.info("Done scraping LinkedIn for new jobs")
     p_time = int(time.time())
-    processed_data = post_job_scrape_processing(data, all_jobs)
+    processed_data, scrape_dups, previously_found, scrape_duds = post_job_scrape_processing(data, all_jobs)
     processing_time += int(time.time()) - p_time
     logging.info("Backing up the scrape")
     save_json_data(processed_data, "scrape_backups/" + str(datetime.today().date()) + ".json")
@@ -565,6 +592,9 @@ if __name__ == '__main__':
                 if word.lower() in str(job['content']).lower():
                     keywords.append(word)
                     rating += word_weights[word]
+        if 'security' in job['title'].lower():
+            keywords.append('security')
+            rating += 50
         job['keywords'] = ','.join(keywords)
         job['rating'] = rating
         if rating < 0:
@@ -592,10 +622,14 @@ if __name__ == '__main__':
 
     # Doing this as an inner function to keep it simple
     def post_script_report(write, data, end_scrape, start_scrape, end_content,
-                           start_content, processing_time, processed_data):
+                           start_content, processing_time, processed_data,
+                           scrape_dups, previously_found, scrape_duds):
         write("We previously had %d jobs found" % len(all_jobs))
         total_scrape = reduce(lambda count, l: count + len(l), data, 0)
         write("Today we scraped %d jobs from LinkedIn" % total_scrape)
+        write("%d of those were duplicates" % scrape_dups)
+        write("%d of those had already been previously found" % previously_found)
+        write("%d of those were duds" % scrape_duds)
         write("It took us %d seconds to do the scrape, %d seconds to get content, and %d seconds to process the data" %
               ((end_scrape - start_scrape), (end_content - start_content), processing_time))
         write("%d of the %d scraped jobs are new" % (len(processed_data), total_scrape))
@@ -603,11 +637,14 @@ if __name__ == '__main__':
         write("In total we have scraped %d jobs to date" % (len(all_jobs + good_jobs + bad_jobs)))
     if config['post_script_console_report']:
         post_script_report(print, data, end_scrape, start_scrape, end_content,
-                           start_content, processing_time, processed_data)
+                           start_content, processing_time, processed_data,
+                           scrape_dups, previously_found, scrape_duds)
         post_script_report(logging.info, data, end_scrape, start_scrape, end_content,
-                           start_content, processing_time, processed_data)
+                           start_content, processing_time, processed_data,
+                           scrape_dups, previously_found, scrape_duds)
     else:
         post_script_report(logging.info, data, end_scrape, start_scrape, end_content,
-                           start_content, processing_time, processed_data)
+                           start_content, processing_time, processed_data,
+                           scrape_dups, previously_found, scrape_duds)
     logging.info("Daily job scrape complete!")
     driver.close()
