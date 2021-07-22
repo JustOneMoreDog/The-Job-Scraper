@@ -109,17 +109,62 @@ def get_job_content(url, driver, shared_driver, config):
 
 # This will check if we are getting dickled and LinkedIn redirected us to a login page
 def validate_page(driver):
-    parsed = urlparse.urlparse(driver.current_url)
-    if 'session_redirect' in parse_qs(parsed.query):
-        logging.warning("LinkedIn redirected us and so we need to sleep for a few seconds and then continue the search")
-        time.sleep(3)
-        driver.get(str(parse_qs(parsed.query)['session_redirect'][0]))
-        return None
-    if "sessionRedirect" in parse_qs(parsed.query):
-        logging.warning("LinkedIn redirected us and so we need to sleep for a few seconds and then continue the search")
-        time.sleep(3)
-        driver.get(str(parse_qs(parsed.query)['sessionRedirect'][0]))
-        return None
+    # The different params where our original url can be stored
+    checks = ["sessionRedirect", 'session_redirect']
+    # Initial backoff set to 2 since that seems to be the number that works the best
+    backoff = 2
+    while True:
+        backoff += 1
+        # Both of these need to not have happened in order for the page to be considered valid
+        if check_for_redirect(driver, checks, backoff) and check_for_429(driver, backoff):
+            break
+
+
+# Utility function for validate_page
+def check_for_redirect(driver, checks, backoff):
+    never_redirected = True
+    while True:
+        # Grabbing our current url and parsing all of its params
+        parsed = urlparse.urlparse(driver.current_url)
+        redirected = False
+        for check in checks:
+            # If one of the above params is in the url then we have been redirected
+            if check in parse_qs(parsed.query):
+                redirected = True
+                never_redirected = False
+                logging.warning("LinkedIn redirected us and so we need to sleep and then continue the search")
+                time.sleep(backoff)
+                # We now tell selenium to try and load the url we actually wanted to go to
+                driver.get(str(parse_qs(parsed.query)[check][0]))
+                # Then we tell it to wait for that page to load
+                driver.wait_for_page_load()
+                # Then we make sure that we have not been 429-ed
+                check_for_429(driver, backoff)
+                break
+        if redirected:
+            continue
+        else:
+            break
+    return never_redirected
+
+
+# Utility function for validate_page
+def check_for_429(driver, backoff):
+    never_429ed = True
+    while True:
+        http_429_check = driver.find_elements_by_xpath(config['http_429_xpath'])
+        if not http_429_check:
+            break
+        else:
+            logging.info("We have been 429-ed so we are going to sleep")
+            never_429ed = False
+            time.sleep(backoff)
+            backoff += 1
+            logging.info("Refreshing the page")
+            driver.refresh()
+            driver.wait_for_page_load()
+            time.sleep(1)
+    return never_429ed
 
 
 def get_job_posts(search: str, locations: list, minimum_threshold: int, driver, config):
@@ -127,8 +172,9 @@ def get_job_posts(search: str, locations: list, minimum_threshold: int, driver, 
     # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
     def wait_and_sleep(shared_driver):
         shared_driver.wait_for_page_load()
-        validate_page(driver)
-        time.sleep(1)
+        sleep = 1
+        validate_page(shared_driver)
+        time.sleep(1.25)
 
     # Inner function that will move to an element and then press tab and then enter
     def send_tab_enter(e):
@@ -414,7 +460,12 @@ def save_job_report_html(data, path):
     </body>
     </html>
     """
-    # Adding an <a> tag that links to the job report
+    # First we make sure the default landing page is there and if not we make it
+    if not os.path.exists(index_path):
+        with open(index_path, "w") as f:
+            soup = BeautifulSoup(html, "html.parser")
+            f.write(str(soup))
+    # Then we add a link to today's job report on the main page
     with open(index_path, "r") as f:
         soup = BeautifulSoup(f, "html.parser")
         p = "/" + str(datetime.today().date()) + "/index.html"
@@ -422,27 +473,27 @@ def save_job_report_html(data, path):
         new_tag.string = str(datetime.today().date())
         soup.body.append(soup.new_tag('br'))
         soup.body.append(new_tag)
-    # Saving the new index.html file
+    # Then we save the updated main page to disk
     with open(index_path, "w") as f:
         f.write(str(soup))
+    # Now we move our path into the directory for todays report
     path = os.path.join(path, (str(datetime.today().date())))
     index_path = os.path.join(path, "index.html")
-    # Making sure the HTML path exists
+    # If the directory does not exist (it should not) we make it
     if not os.path.exists(path):
         os.mkdir(path)
-    # Making sure that there is an index.html in the HTML path and if not we make one
+    # Now we repeat the above process of making a basic index.html page for our report
     if not os.path.exists(index_path):
         with open(index_path, "w") as f:
             soup = BeautifulSoup(html, "html.parser")
             f.write(str(soup))
-    # Creating our job report table using tabulate
+    # Except now we make a table for it instead
     with open(os.path.join(path, "index.html"), "w") as f:
         # We want our data to be in a certain order
         ordered_data = [{k: d[k] for k in keys} for d in data]
         for d in ordered_data:
             # Rather than having the content in the table, we make a different html page for it
             # This ensures that the table looks clean and is easy to read
-            # We do not always need the content anyways
             if d['content']:
                 # Since each job posting that we scrape is deemed unique by their url, and since each url will start
                 # the same, then the last section of the url is guaranteed to be unique. This ensures that we do not
@@ -451,13 +502,11 @@ def save_job_report_html(data, path):
                 os.mkdir(os.path.join(path, content_folder))
                 content_path = os.path.join(content_folder, "content.html")
                 soup = BeautifulSoup(html, "html.parser")
-                #new_tag = soup.new_tag('p')
-                #new_tag.string = d['content']
                 soup.body.append(d['content'])
                 # Writing the content to its own file
                 with open(os.path.join(path, content_path), "w", encoding='utf-8-sig') as g:
                     g.write(str(soup.prettify()))
-                # This makes it so that it opens up in a new tab
+                # _blank makes it so that it opens up in a new tab
                 a_tag = soup.new_tag('a', href=content_path, target="_blank", rel="noopener noreferrer")
                 a_tag.string = "Content"
                 d['content'] = a_tag
@@ -592,9 +641,6 @@ if __name__ == '__main__':
                 if word.lower() in str(job['content']).lower():
                     keywords.append(word)
                     rating += word_weights[word]
-        if 'security' in job['title'].lower():
-            keywords.append('security')
-            rating += 50
         job['keywords'] = ','.join(keywords)
         job['rating'] = rating
         if rating < 0:
