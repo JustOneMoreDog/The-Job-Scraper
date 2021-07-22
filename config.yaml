@@ -1,10 +1,10 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
-headless: true
+headless: false
 timeout: 10
 max_retries: 3
 scrape_all_last_day_jobs: true
 window_size: "1920,1080"
-post_script_console_report: false
+post_script_console_report: true
 xpath_see_more_jobs_button: "//button[contains(text(), 'See more jobs')]"
 any_time_button: "//button[contains(text(), 'Any Time')]"
 past_month_button: "//label[contains(text(), 'Past Month')]"
@@ -26,3 +26,4 @@ job_description_show_more: "//button[contains(text(), 'Show more')]"
 job_description_xpath: "//div[contains(@class, 'show-more-less-html__markup')]"
 job_description_class: "show-more-less-html__markup"
 job_description_tag: "div"
+http_429_xpath: "//div[contains(text(), 'HTTP ERROR 429')]"
