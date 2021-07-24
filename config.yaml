@@ -1,5 +1,5 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
-headless: false
+headless: true
 timeout: 10
 max_retries: 3
 scrape_all_last_day_jobs: true
