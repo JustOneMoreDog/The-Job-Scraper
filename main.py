@@ -36,9 +36,10 @@ root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 root.addHandler(log_file_handler)
 logging.info("Logging has been setup. Script is starting")
 
-def parse(tag, config, search) -> Dict[str, Any]:
-    job = {key: None for key in ["posted_time", "location", "title", "company", "url", "search"]}
+def parse(tag, config, search, remote) -> Dict[str, Any]:
+    job = {key: None for key in ["posted_time", "location", "title", "company", "url", "search", "remote"]}
     job["search"] = search
+    job["remote"] = remote
     x = None
     x = tag.find('time')
     if x:
@@ -78,6 +79,7 @@ def get_job_content(url, driver, shared_driver, config):
         driver.get(url)
         shared_driver.wait_for_page_load()
         time.sleep(1)
+        validate_page(shared_driver)
         if not http_429_error_check(driver):
             break
         retries -= 1
@@ -89,6 +91,7 @@ def get_job_content(url, driver, shared_driver, config):
             driver.get(url)
             shared_driver.wait_for_page_load()
             time.sleep(1)
+            validate_page(shared_driver)
         try:
             for b in driver.find_elements_by_xpath(config['job_description_show_more']):
                 if b.text == 'Show more':
@@ -167,26 +170,208 @@ def check_for_429(driver, backoff):
     return never_429ed
 
 
-def get_job_posts(search: str, locations: list, minimum_threshold: int, driver, config):
-
+def get_job_posts(location, timespan_button, config, driver, known_tags, total_valid_job_postings, complete_data, day, search, remote):
     # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
     def wait_and_sleep(shared_driver):
         shared_driver.wait_for_page_load()
-        sleep = 1
         validate_page(shared_driver)
-        time.sleep(1.25)
+        shared_driver.wait_for_page_load()
+        time.sleep(1.5)
 
     # Inner function that will move to an element and then press tab and then enter
     def send_tab_enter(e):
         ActionChains(driver).move_to_element(e).send_keys(Keys.TAB).send_keys(Keys.ENTER).perform()
 
+    # valid_job_postings = 0
+    if remote:
+        logging.info("(%s): starting job hunt for %s in %s with remote set to true" % (search, search, location))
+    else:
+        logging.info("(%s): starting job hunt for %s in %s with remote set to false" % (search, search, location))
+
+    driver.get('https://www.linkedin.com/jobs')
+    SharedDriver().wait_for_page_load()
+    wait_and_sleep(SharedDriver())
+
+    # Typing in our search
+    keywords_input = FindBy.NAME("keywords", visible_only=True)
+    keywords_input.click()
+    keywords_input.send_keys(search + Keys.ENTER)
+    wait_and_sleep(SharedDriver())
+
+    # Defining our location
+    location_input = FindBy.NAME("location", visible_only=True)
+    location_input.click()
+    location_input.clear()
+    location_input.send_keys(location + Keys.ENTER)
+    wait_and_sleep(SharedDriver())
+
+    # Filtering by remote only jobs
+    if remote:
+        logging.info("(%s): Filtering in only remote jobs for %s in %s" % (search, search, location))
+        driver.find_elements_by_xpath(config['remote_button'])[0].click()
+        driver.find_elements_by_xpath(config['remote_label'])[0].click()
+        for button in driver.find_elements_by_xpath(config['done_button']):
+            try:
+                button.click()
+                break
+            except selenium.common.exceptions.ElementNotInteractableException as e:
+                continue
+        wait_and_sleep(SharedDriver())
+
+    # Limiting our search results to the past week
+    driver.find_elements_by_xpath(config['any_time_button'])[0].click()
+    timespan_buttons = driver.find_elements_by_xpath(timespan_button)
+    if len(timespan_buttons) > 0:
+        driver.find_elements_by_xpath(timespan_button)[0].click()
+    else:
+        logging.info("(%s): We could not find the timespan of %s" % (search, timespan_button))
+    time.sleep(1)
+    for button in driver.find_elements_by_xpath(config['done_button']):
+        try:
+            button.click()
+            break
+        except selenium.common.exceptions.ElementNotInteractableException as e:
+            continue
+    wait_and_sleep(SharedDriver())
+
+    if FindBy.XPATH(config['no_results']).is_present():
+        logging.warning("No results found for the keyword: %s" % search)
+        return known_tags, total_valid_job_postings, complete_data
+
+    # Limiting our search to full time positions
+    if driver.find_elements_by_xpath(config['job_type_button']):
+        driver.find_elements_by_xpath(config['job_type_button'])[0].click()
+    else:
+        driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
+        driver.find_element_by_xpath(config['job_type_nested_button']).click()
+    driver.find_elements_by_xpath(config['full_time_button'])[0].click()
+    time.sleep(1)
+    for b in driver.find_elements_by_xpath(config['done_button']):
+        if "done" in b.text.lower():
+            b.click()
+            break
+    wait_and_sleep(SharedDriver())
+
+    if FindBy.XPATH(config['no_results']).is_present():
+        logging.warning("No results found for the keyword: %s" % search)
+        return known_tags, total_valid_job_postings, complete_data
+
+    # Limiting our Experience level to only certain levels
+    if driver.find_elements_by_xpath(config['more_filters_button']):
+        driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
+        time.sleep(.25)
+        driver.find_elements_by_xpath(config['exp_level_span_button'])[0].click()
+        for job_level in driver.find_elements_by_xpath(config['ul_li_filter_list']):
+            if any(x for x in [y for y in config['experience_levels'].keys() if config['experience_levels'][y]] if
+                   x.lower() in job_level.text.lower()):
+                job_level.click()
+    else:
+        driver.find_elements_by_xpath(config['exp_level_button'])[0].click()
+        job_levels = [j for j in driver.find_elements_by_xpath(config['div_filter_list']) if j.text and
+                      len(j.text.split("(")) == 2]
+        for job_level in job_levels:
+            if any(x for x in [y for y in config['experience_levels'].keys() if config['experience_levels'][y]]
+                   if x.lower() in job_level.text.lower()):
+                job_level.click()
+    time.sleep(.5)
+    for b in driver.find_elements_by_xpath(config['done_button']):
+        if "done" in b.text.lower():
+            b.click()
+            break
+    wait_and_sleep(SharedDriver())
+
+    if FindBy.XPATH(config['no_results']).is_present():
+        logging.warning("No results found for the keyword: %s" % search)
+        return known_tags, total_valid_job_postings, complete_data
+
+    last_height = 0
+    # Handling the infinite scroll
+    while True:
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        wait_and_sleep(SharedDriver())
+        newHeight = driver.execute_script("return document.body.scrollHeight")
+        if newHeight == last_height:
+            try:
+                logging.info("(%s): Reached bottom. Seeing if there are more jobs" % search)
+                more_jobs = driver.find_elements_by_xpath(config['xpath_see_more_jobs_button'])
+                if more_jobs[0].is_displayed():
+                    logging.info("(%s): More jobs found" % search)
+                    more_jobs[0].click()
+                    wait_and_sleep(SharedDriver())
+                else:
+                    logging.info("(%s): No more jobs found" % search)
+                    break
+            except selenium.common.exceptions.NoSuchElementException as e:
+                logging.info("(%s): No more results" % search)
+                break
+            except IndexError as f:
+                logging.warning("(%s): No job results found" % search)
+                break
+                # return []
+        # Once it has loaded the new results we get the contents of the page and scrape the job postings
+        page_soup = SharedDriver().page_soup
+        tags = []
+        for ul in page_soup.findAll('ul', class_=config['job_results_selector']):
+            for li in ul.findAll('li'):
+                tags.append(li)
+        new_tags = [tag for tag in tags if tag not in known_tags] or []
+        logging.info("(%s): %d new jobs found" % (search, len(new_tags)))
+        known_tags.extend(new_tags)
+        logging.info("(%s): %d total jobs found" % (search, len(known_tags)))
+        # Transforming the HTML data into a proper format
+        parsed_tags = [parse(tag, config, search, remote) for tag in known_tags]
+        for j in parsed_tags:
+            if j["location"]:
+                j["location"] = (str(j['location']).split(", United States"))[0]
+            if is_a_valid_job_posting(j, config):
+                total_valid_job_postings += 1
+        complete_data.extend(parsed_tags)
+        logging.info("(%s): %d total valid jobs found" % (search, total_valid_job_postings))
+        # The min jobs per search is more of a, stop after this point, kind of deal
+        # Since scraping jobs for the past week or month can be intensive we will break out as soon as we
+        # hit our threshold instead continuing down the endless postings
+        # In config.yaml a user can force the script to get all jobs in the last 24 hours
+        # By default this is turned off as it drastically increases the scrape time
+        if day and config['scrape_all_last_day_jobs'] and location != 'United States':
+            logging.info("(%s): Continuing to scrape all last day jobs (Location = %s)" % (search, location))
+            last_height = newHeight
+            continue
+        # Otherwise we will check if we have enough postings
+        elif total_valid_job_postings >= minimum_threshold:
+            logging.info("(%s): %d is over our threshold so we can break out now" %
+                         (search, total_valid_job_postings))
+            break
+        # If we do not have enough then we will continue
+        else:
+            last_height = newHeight
+            logging.info("(%s): We are now at %d valid job postings" % (search, total_valid_job_postings))
+        # else:
+        #    logging.info("(%s): We are now at %d valid job postings" % (search, valid_job_postings))
+        # last_height = newHeight
+    logging.info("(%s): finished job hunt in %s and are now at %d valid jobs" %
+                 (search, location, total_valid_job_postings))
+    return known_tags, total_valid_job_postings, complete_data
+
+
+def scrape_jobs(search: str, locations: list, minimum_threshold: int, driver, config):
     SharedDriver.set_instance(driver)
+
     known_tags = []
     total_valid_job_postings = 0
     complete_data = []
     day = True
     week = False
     month = False
+    '''
+    if remote only is true then we set our locations variable to be only the remote location
+    if remote only is false then we append the locations list with the remote location
+    then in the for loop that goes through the locations we can have a conditional that checks
+    after we specify the time and location we would have a check that says 
+    if remote only is false and the location is equal to the remote only location
+    then activate the remote filter
+    '''
+    if config['include_remote']:
+        locations.append(config['remote_location'])
     while True:
         timespan_button = None
         if day:
@@ -202,149 +387,19 @@ def get_job_posts(search: str, locations: list, minimum_threshold: int, driver, 
             logging.info("(%s): No more timespans to use. Breaking out." % search)
             break
         for location in locations:
-            # valid_job_postings = 0
-            logging.info("(%s): starting job hunt for %s in %s" % (search, search, location))
+            # First we do our basic search on the location
+            if config['include_remote']:
+                known_tags, total_valid_job_postings, complete_data = get_job_posts(
+                    location, timespan_button, config, driver, known_tags,
+                    total_valid_job_postings, complete_data, day, search, True
+                )
+            if not config['remote_only'] and location != config['remote_location']:
+                known_tags, total_valid_job_postings, complete_data = get_job_posts(
+                    location, timespan_button, config, driver, known_tags,
+                    total_valid_job_postings, complete_data, day, search, False
+                )
+            # Next we do our search for only remote
 
-            driver.get('https://www.linkedin.com/jobs')
-            SharedDriver().wait_for_page_load()
-            wait_and_sleep(SharedDriver())
-
-            # Typing in our search
-            keywords_input = FindBy.NAME("keywords", visible_only=True)
-            keywords_input.click()
-            keywords_input.send_keys(search + Keys.ENTER)
-            wait_and_sleep(SharedDriver())
-
-            # Defining our location
-            location_input = FindBy.NAME("location", visible_only=True)
-            location_input.click()
-            location_input.clear()
-            location_input.send_keys(location + Keys.ENTER)
-            wait_and_sleep(SharedDriver())
-
-            # Limiting our search results to the past week
-            driver.find_elements_by_xpath(config['any_time_button'])[0].click()
-            driver.find_elements_by_xpath(timespan_button)[0].click()
-            time.sleep(1)
-            send_tab_enter(driver.find_elements_by_xpath(config['past_day_button'])[0])
-            wait_and_sleep(SharedDriver())
-
-            if FindBy.XPATH(config['no_results']).is_present():
-                logging.warning("No results found for the keyword: %s" % search)
-                continue
-
-            # Limiting our search to full time positions
-            if driver.find_elements_by_xpath(config['job_type_button']):
-                driver.find_elements_by_xpath(config['job_type_button'])[0].click()
-            else:
-                driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
-                driver.find_element_by_xpath(config['job_type_nested_button']).click()
-            driver.find_elements_by_xpath(config['full_time_button'])[0].click()
-            time.sleep(1)
-            for b in driver.find_elements_by_xpath(config['done_button']):
-                if "done" in b.text.lower():
-                    b.click()
-                    break
-            wait_and_sleep(SharedDriver())
-
-            if FindBy.XPATH(config['no_results']).is_present():
-                logging.warning("No results found for the keyword: %s" % search)
-                continue
-
-            # Limiting our Experience level to only certain levels
-            if driver.find_elements_by_xpath(config['more_filters_button']):
-                driver.find_elements_by_xpath(config['more_filters_button'])[0].click()
-                time.sleep(.25)
-                driver.find_elements_by_xpath(config['exp_level_span_button'])[0].click()
-                for job_level in driver.find_elements_by_xpath(config['ul_li_filter_list']):
-                    if any(x for x in [y for y in config['experience_levels'].keys() if config['experience_levels'][y]] if
-                           x.lower() in job_level.text.lower()):
-                        job_level.click()
-            else:
-                driver.find_elements_by_xpath(config['exp_level_button'])[0].click()
-                job_levels = [j for j in driver.find_elements_by_xpath(config['div_filter_list']) if j.text and
-                              len(j.text.split("(")) == 2]
-                for job_level in job_levels:
-                    if any(x for x in [y for y in config['experience_levels'].keys() if config['experience_levels'][y]]
-                           if x.lower() in job_level.text.lower()):
-                        job_level.click()
-            time.sleep(.5)
-            for b in driver.find_elements_by_xpath(config['done_button']):
-                if "done" in b.text.lower():
-                    b.click()
-                    break
-            wait_and_sleep(SharedDriver())
-
-            if FindBy.XPATH(config['no_results']).is_present():
-                logging.warning("No results found for the keyword: %s" % search)
-                continue
-
-            last_height = 0
-            # Handling the infinite scroll
-            while True:
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                wait_and_sleep(SharedDriver())
-                newHeight = driver.execute_script("return document.body.scrollHeight")
-                if newHeight == last_height:
-                    try:
-                        logging.info("(%s): Reached bottom. Seeing if there are more jobs" % search)
-                        more_jobs = driver.find_elements_by_xpath(config['xpath_see_more_jobs_button'])
-                        if more_jobs[0].is_displayed():
-                            logging.info("(%s): More jobs found" % search)
-                            more_jobs[0].click()
-                            wait_and_sleep(SharedDriver())
-                        else:
-                            logging.info("(%s): No more jobs found" % search)
-                            break
-                    except selenium.common.exceptions.NoSuchElementException as e:
-                        logging.info("(%s): No more results" % search)
-                        break
-                    except IndexError as f:
-                        logging.warning("(%s): No job results found" % search)
-                        break
-                        #return []
-                # Once it has loaded the new results we get the contents of the page and scrape the job postings
-                page_soup = SharedDriver().page_soup
-                tags = []
-                for ul in page_soup.findAll('ul', class_=config['job_results_selector']):
-                    for li in ul.findAll('li'):
-                        tags.append(li)
-                new_tags = [tag for tag in tags if tag not in known_tags] or []
-                logging.info("(%s): %d new jobs found" % (search, len(new_tags)))
-                known_tags.extend(new_tags)
-                logging.info("(%s): %d total jobs found" % (search, len(known_tags)))
-                # Transforming the HTML data into a proper format
-                parsed_tags = [parse(tag, config, search) for tag in known_tags]
-                for j in parsed_tags:
-                    if j["location"]:
-                        j["location"] = (str(j['location']).split(", United States"))[0]
-                    if is_a_valid_job_posting(j, config):
-                        total_valid_job_postings += 1
-                complete_data.extend(parsed_tags)
-                logging.info("(%s): %d total valid jobs found" % (search, total_valid_job_postings))
-                # The min jobs per search is more of a, stop after this point, kind of deal
-                # Since scraping jobs for the past week or month can be intensive we will break out as soon as we
-                # hit our threshold instead continuing down the endless postings
-                # In config.yaml a user can force the script to get all jobs in the last 24 hours
-                # By default this is turned off as it drastically increases the scrape time
-                if day and config['scrape_all_last_day_jobs']:
-                    last_height = newHeight
-                    continue
-                # Otherwise we will check if we have enough postings
-                elif total_valid_job_postings >= minimum_threshold:
-                    logging.info("(%s): %d is over our threshold so we can break out now" %
-                                 (search, total_valid_job_postings))
-                    break
-                # If we do not have enough then we will continue
-                else:
-                    last_height = newHeight
-                    logging.info("(%s): We are now at %d valid job postings" % (search, total_valid_job_postings))
-                #else:
-                #    logging.info("(%s): We are now at %d valid job postings" % (search, valid_job_postings))
-                #last_height = newHeight
-            logging.info("(%s): finished job hunt in %s and are now at %d valid jobs" %
-                         (search, location, total_valid_job_postings))
-            # total_valid_job_postings += valid_job_postings
         # Now we check if we have enough valid jobs scraped
         # If not, we escalate the timespan accordingly
         if total_valid_job_postings < minimum_threshold:
@@ -576,7 +631,7 @@ if __name__ == '__main__':
         i = config['max_retries']
         while i != 0:
             try:
-                scraped_job_posts = get_job_posts(
+                scraped_job_posts = scrape_jobs(
                     search=search, locations=locations, minimum_threshold=minimum_threshold,
                     driver=driver, config=config
                 )
@@ -586,7 +641,7 @@ if __name__ == '__main__':
                 logging.exception("There was an error with getting jobs for '%s'" % search)
                 logging.warning("This is the URL that caused the error %s" % driver.current_url)
                 logging.warning("We are going to sleep for 5 and then retry. We have %d tries left" % (i-1))
-                time.sleep(5)
+                time.sleep(120)
                 i -= 1
         search_stop_time = int(time.time())
         search_time = search_stop_time - search_start_time
@@ -623,10 +678,14 @@ if __name__ == '__main__':
     # total_desired_words = len(word_weights)
     for job in processed_data:
         keywords = []
+        if job['remote']:
+            rating = 100
+            keywords.append('REMOTE')
+        else:
+            rating = 0
         # If the job is in a place we do not want to work
         # Or if the job is for a company we do not want to work for
         # Or if the job had an excluded keyword in the title
-        rating = 0
         if any(l for l in excluded_locations if l.lower() in job['location'].lower()):
             keywords.append('LOC')
             rating = -999

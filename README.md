@@ -1,16 +1,13 @@
-This is in Beta. Will continue to add documentation, fixes, and features as I test this.
-
 # LinkedIn Job Scraper
 
 Thank you to the GitHub user Hrissimir and their [scrape_jobs repository](https://github.com/Hrissimir/scrape_jobs) as I was able to use their proof of concept as the starting point for this project.
 
 ## Description 
 
-This script will search LinkedIn using user provided phrases, limit it to the past week, limit it to a location, grab the desired amount of job postings, remove previously found job postings, rate the postings based on where the job is and if there are any keywords in the description, and then save the report to an Excel file.
+This script will search LinkedIn using user provided phrases, limit it to a certain timeframe, limit it to a location, limit to certain experience levels, limit to remote jobs only if desired, then grab the desired amount of job postings, remove previously found job postings, remove jobs that are either in an undesired location or are from an undesired company, rate the postings based on weights set by the user, and then save the report in an HTML format to a web directory.
 
-All the above features can be configured in the `config.yaml` file. This script is designed to be your companion during your job search. Since you can control all the filters, you should be adjusting those filters after each generated report. In the instructions below I will show you how to set this script up to run daily.
+All the above features can be configured in the `customizations.yaml` file. This script is designed to be your companion during your job search. Since you can control all the filters, you should be adjusting those filters after each generated report. In the instructions below I will show you how to set this script up to run daily.
 
-For a detailed usage guide on this script and to see how I have used it for my job hunt check out my
 
 ## Installing Dependencies
 
@@ -35,3 +32,16 @@ cd LinkedIn-Job-Scraper
 python3 -m pip install -r requirements.txt
 ```
 
+## Setting Up Cron
+
+I personally use cron to setup daily runs of this in the morning. The code takes about an hour and half on average to finish running. This is mainly due to LinkedIn constantly trying to prevent bots like mine. Their protection only gets more aggressive if I do not sleep for a bit after being detected. Having it run at 5am every morning means that I am never waiting on it to finish. By the time I wake up and browse to the web server, it is done scraping and has a report for me.
+
+```
+SHELL=/bin/bash
+PATH=/home/sandwich/.local/bin:/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin
+0 5 * * * cd /home/sandwich/PycharmProjects/jobhunter/ && /usr/bin/python3 /home/sandwich/PycharmProjects/jobhunter/main.py 2>&1
+```
+
+## To-Do
+
+Turn this into a container. Would be nice.
