@@ -183,7 +183,10 @@ def get_job_posts(location, timespan_button, config, driver, known_tags, total_v
         ActionChains(driver).move_to_element(e).send_keys(Keys.TAB).send_keys(Keys.ENTER).perform()
 
     # valid_job_postings = 0
-    logging.info("(%s): starting job hunt for %s in %s" % (search, search, location))
+    if remote:
+        logging.info("(%s): starting job hunt for %s in %s with remote set to true" % (search, search, location))
+    else:
+        logging.info("(%s): starting job hunt for %s in %s with remote set to false" % (search, search, location))
 
     driver.get('https://www.linkedin.com/jobs')
     SharedDriver().wait_for_page_load()
@@ -330,6 +333,7 @@ def get_job_posts(location, timespan_button, config, driver, known_tags, total_v
         # In config.yaml a user can force the script to get all jobs in the last 24 hours
         # By default this is turned off as it drastically increases the scrape time
         if day and config['scrape_all_last_day_jobs'] and location != 'United States':
+            logging.info("(%s): Continuing to scrape all last day jobs (Location = %s)" % (search, location))
             last_height = newHeight
             continue
         # Otherwise we will check if we have enough postings
