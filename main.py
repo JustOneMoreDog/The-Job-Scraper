@@ -329,7 +329,7 @@ def get_job_posts(location, timespan_button, config, driver, known_tags, total_v
         # hit our threshold instead continuing down the endless postings
         # In config.yaml a user can force the script to get all jobs in the last 24 hours
         # By default this is turned off as it drastically increases the scrape time
-        if day and config['scrape_all_last_day_jobs']:
+        if day and config['scrape_all_last_day_jobs'] and location != 'United States':
             last_height = newHeight
             continue
         # Otherwise we will check if we have enough postings
