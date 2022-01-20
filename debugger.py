@@ -60,8 +60,8 @@ def parse(tag, config) -> Dict[str, Any]:
 
 config = {**load_yaml_data("config.yaml"), **load_yaml_data("customizations.yaml")}
 searches = config['searches']
-location = config['location']
-max_jobs = config['max_jobs_per_search']
+location = config['locations']
+max_jobs = config['minimum_jobs_per_search']
 excluded_locations = config['excluded_locations']
 excluded_companies = config['excluded_companies']
 excluded_title_keywords = config['excluded_title_keywords']
@@ -191,3 +191,37 @@ else:
         print(tabulate(sorted_data, headers="keys", tablefmt="grid"))
     else:
         print("No jobs found")
+
+
+'''
+# I could get it to sign in just fine but it ended up adding more problems than it solved
+# The main problem was theact that I would need to re-do the infinite scroll 
+authenticated = False
+    if config['LoginToLinkedIn']:
+        driver.get('https://www.linkedin.com/jobs')
+        SharedDriver().wait_for_page_load()
+        time.sleep(1.5)
+        login = driver.find_elements_by_xpath("//div/a[contains(text(), 'Sign in')]")
+        if login:
+            login[0].click()
+            SharedDriver().wait_for_page_load()
+            time.sleep(1.5)
+            username = driver.find_element_by_id('username')
+            username.click()
+            username.send_keys(config['Username'])
+            password = driver.find_element_by_id('password')
+            password.click()
+            password.send_keys(config['Password'] + Keys.ENTER)
+            SharedDriver().wait_for_page_load()
+            time.sleep(1.5)
+            # Checking to make sure it was the right username and password
+            if driver.current_url != 'https://www.linkedin.com/jobs/':
+                logging.warning("Unable to sign into LinkedIn with the given credentials")
+            else:
+                logging.info("Logged into LinkedIn with given credentials")
+                authenticated = True
+        else:
+            logging.warning("There was an error while trying to sign in")
+    else:
+        logging.info("Scraping LinkedIn as a guest user")
+'''
