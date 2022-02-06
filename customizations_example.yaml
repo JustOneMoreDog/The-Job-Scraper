@@ -1,34 +1,54 @@
 # What we will search on LinkedIn
 searches:
-  - Security Engineer
+  # Job titles that are relevant to me
+  - Software Developer
+  - Software Engineer
 # How many jobs to scrape from each location for each search
-minimum_jobs_per_search: 200
+minimum_jobs_per_search: 300
 # The exact match location
 locations:
-  - Washington DC-Baltimore Area
+  - Indianapolis, Indiana, United States
+  - Chicago, Illinois, United States
 # Experience level we want to search for
 experience_levels:
   Internship: false
-  Entry level: true
+  Entry level: false
   Associate: true
-  Mid-Senior level: false
+  Mid-Senior level: true
   Director: false
 # Any locations that we want to exclude.
 excluded_locations:
-  - "Chantilly"
+  - "Mars"
 # Any companies that we want to exclude
 excluded_companies:
-  - "ClearanceJobs"
+  - "PROTEK"
+  - "Summit2Sea"
+  - "Onyx"
+  - "Red Cedar"
 # If a job title contains a keyword that we do not want ex. Senior
 excluded_title_keywords:
+  - "Senior"
+  - "Lead"
   - "Manager"
+  - "Clearance"
+  - "Sr. "
+  - "Data Scientist"
 # Words to look for in the job posting and how heavy their weight should be
 word_weights:
-  clearance: -50
-  travel: -10
-  AWS Security: 20
-  GIAC: 10
-  kubernetes: 5
-  ansible: 5
+  DHS: -50
+  TS/SCI: -50
+  API: 10
+  CI/CD: 10
+  Linux: 20
+  bachelors: 30
+  python: 30
+  java: 10
+  unity engine: 50
+  c++: 10
+  cloud: 10
+  travel: 0
+  jira: 30
+  full stack: 0
+  UI/UX: 20
 save_to_html: true
-html_folder: "html_reports"
+html_folder: "/var/www/desktopdev/"
