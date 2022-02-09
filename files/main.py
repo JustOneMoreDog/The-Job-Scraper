@@ -613,6 +613,8 @@ if __name__ == '__main__':
     options = Options()
     if config['headless']:
         options.add_argument("--headless")
+        #options.add_argument("--remote-debugging-port=9222")
+        #options.add_argument("--no-sandbox")
     options.add_argument("window-size=%s" % config['window_size'])
     options.add_argument('--log-level=2')
     driver = webdriver.Chrome(options=options)

@@ -31,4 +31,4 @@ word_weights:
   kubernetes: 5
   ansible: 5
 save_to_html: true
-html_folder: "html_reports"
+html_folder: "/var/www/jobhunter"

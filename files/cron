@@ -1,0 +1,4 @@
+SHELL=/bin/bash
+PATH=/home/root/.local/bin:/sbin:/bin:/usr/bin:/usr/local/bin:/snap/bin
+0 5 * * * cd /app && /usr/bin/python3 /app/main.py 2>&1
+
