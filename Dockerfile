@@ -38,7 +38,6 @@ RUN chown -R hunter:hunter /app
 USER hunter
 WORKDIR /app
 # Installing the app dependencies
-RUN export PATH="$PATH:/home/hunter/.local/bin" >> /home/hunter/.bashrc
 RUN pip3 install -r requirements.txt
 # Setting up cron
 RUN cat /app/cron | crontab -

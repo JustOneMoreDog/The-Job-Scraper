@@ -31,4 +31,4 @@ remote_button: "//button[contains(text(), 'On-site/Remote')]"
 remote_label: "//label[contains(text(), 'Remote')]"
 include_remote: true
 remote_only: false
-remote_location: United States
+remote_location: "United States"
