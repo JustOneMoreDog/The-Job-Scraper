@@ -16,13 +16,13 @@ RUN mv chromedriver /usr/local/bin/chromedriver
 RUN rm -f chromedriver_linux64.zip
 # Setting up the web server
 RUN mkdir -p /var/www/jobhunter
-RUN mv jobhunter.conf /var/www/jobhunter/jobhunter.conf
+RUN mv jobhunter.conf /etc/apache2/sites-available/jobhunter.conf
 RUN a2ensite jobhunter.conf
 RUN a2dissite 000-default.conf
 #RUN service apache2 restart
 # Adding new user
-RUN useradd -m -s /bin/bash -G sudo hunter
-RUN echo 'hunter ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN useradd -m -s /bin/bash hunter
+#RUN echo 'hunter ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers
 RUN echo 'export PATH="$PATH:/home/hunter/.local/bin"' >> /home/hunter/.bashrc
 RUN chown -R hunter:hunter /app
 RUN chown -R hunter:hunter /var/www/jobhunter
@@ -35,4 +35,7 @@ RUN pip3 install -r requirements.txt --no-warn-script-location
 RUN cat /app/cron | crontab -
 # Running Apache as root
 USER root
-CMD ["/usr/sbin/apachectl", "-D", "FOREGROUND"]
+RUN chmod +x entrypoint.sh
+ENTRYPOINT /app/entrypoint.sh
+#CMD ["/usr/sbin/apachectl", "-D", "FOREGROUND"]
+#CMD ["crond", "-f"]

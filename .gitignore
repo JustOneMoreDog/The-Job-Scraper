@@ -1,8 +1,8 @@
 # Project exclude paths
 /venv/
-/logs/
-/scrape_backups/
-/daily_reports/
-all_jobs.json
-all_jobs.json.old
-customizations.yaml
+files/logs/
+files/scrape_backups/
+files/daily_reports/
+files/all_jobs.json
+files/all_jobs.json.old
+files/customizations.yaml
