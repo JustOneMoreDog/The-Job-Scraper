@@ -34,3 +34,8 @@ remote_only: false
 remote_location: "United States"
 save_to_html: true
 html_folder: "/var/www/jobhunter"
+chrome_options:
+  - "--headless"
+  - "--remote-debugging-port=9222"
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
