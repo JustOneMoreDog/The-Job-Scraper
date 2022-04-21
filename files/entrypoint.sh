@@ -1,4 +1,4 @@
 #!/bin/bash
 
-/usr/sbin/cron
-/usr/sbin/apachectl -D FOREGROUND
+/usr/sbin/apachectl
+sudo -u hunter $(cd /app && /usr/bin/python3 /app/main.py)
