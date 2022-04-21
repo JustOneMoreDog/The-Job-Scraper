@@ -18,6 +18,7 @@ import json
 import os
 import yaml
 import urllib.parse as urlparse
+import schedule
 
 # Setting up our log files
 if not os.path.exists("logs"):
@@ -576,11 +577,11 @@ def save_job_report_html(data, path):
         f.write(str(index_page))
 
 
-if __name__ == '__main__':
+def main():
     # Making sure config file exists
     config = None
     if os.path.exists("config.yaml"):
-        config = {**load_yaml_data("config.yaml"), **load_yaml_data("customizations.yaml")}
+        config = {**load_yaml_data("config.yaml"), **load_yaml_data("customizations.yaml")} 
     else:
         logging.error("Config file is missing")
         exit(-1)
@@ -612,9 +613,8 @@ if __name__ == '__main__':
 
     options = Options()
     if config['headless']:
-        options.add_argument("--headless")
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--no-sandbox")
+      for option in config['chrome_options']:
+        options.add_argument(option)
     options.add_argument("window-size=%s" % config['window_size'])
     options.add_argument('--log-level=2')
     driver = webdriver.Chrome(options=options)
@@ -662,9 +662,8 @@ if __name__ == '__main__':
     start_content = int(time.time())
     options = Options()
     if config['headless']:
-        options.add_argument("--headless")
-        options.add_argument("--remote-debugging-port=9222")
-        options.add_argument("--no-sandbox")
+      for option in config['chrome_options']:
+        options.add_argument(option)
     options.add_argument("window-size=%s" % config['window_size'])
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
     driver = webdriver.Chrome(options=options)
@@ -684,7 +683,8 @@ if __name__ == '__main__':
         keywords = []
         if job['remote']:
             rating = 100
-            keywords.append('REMOTE')
+            if not config['remote_only']:
+              keywords.append('REMOTE')
         else:
             rating = 0
         # If the job is in a place we do not want to work
@@ -757,3 +757,12 @@ if __name__ == '__main__':
                            scrape_dups, previously_found, scrape_duds)
     logging.info("Daily job scrape complete!")
     driver.close()
+
+
+if __name__ == '__main__':
+    main()
+    while True:
+      schedule.every().day.at(load_yaml_data("customizations.yaml")['run_time']).do(main)
+      schedule.run_pending()  
+      time.sleep(60)
+      schedule.clear()
