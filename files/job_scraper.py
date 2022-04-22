@@ -37,6 +37,7 @@ root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 root.addHandler(log_file_handler)
 logging.info("Logging has been setup. Script is starting")
 
+
 def parse(tag, config, search, remote) -> Dict[str, Any]:
     job = {key: None for key in ["posted_time", "location", "title", "company", "url", "search", "remote"]}
     job["search"] = search
@@ -80,7 +81,7 @@ def get_job_content(url, driver, shared_driver, config):
         driver.get(url)
         shared_driver.wait_for_page_load()
         time.sleep(1)
-        validate_page(shared_driver)
+        validate_page(shared_driver, config)
         if not http_429_error_check(driver):
             break
         retries -= 1
@@ -92,7 +93,7 @@ def get_job_content(url, driver, shared_driver, config):
             driver.get(url)
             shared_driver.wait_for_page_load()
             time.sleep(1)
-            validate_page(shared_driver)
+            validate_page(shared_driver, config)
         try:
             for b in driver.find_elements_by_xpath(config['job_description_show_more']):
                 if b.text == 'Show more':
@@ -112,7 +113,7 @@ def get_job_content(url, driver, shared_driver, config):
 
 
 # This will check if we are getting dickled and LinkedIn redirected us to a login page
-def validate_page(driver):
+def validate_page(driver, config):
     # The different params where our original url can be stored
     checks = ["sessionRedirect", 'session_redirect']
     # Initial backoff set to 2 since that seems to be the number that works the best
@@ -120,12 +121,12 @@ def validate_page(driver):
     while True:
         backoff += 1
         # Both of these need to not have happened in order for the page to be considered valid
-        if check_for_redirect(driver, checks, backoff) and check_for_429(driver, backoff):
+        if check_for_redirect(driver, checks, backoff, config) and check_for_429(driver, backoff, config):
             break
 
 
 # Utility function for validate_page
-def check_for_redirect(driver, checks, backoff):
+def check_for_redirect(driver, checks, backoff, config):
     never_redirected = True
     while True:
         # Grabbing our current url and parsing all of its params
@@ -143,7 +144,7 @@ def check_for_redirect(driver, checks, backoff):
                 # Then we tell it to wait for that page to load
                 driver.wait_for_page_load()
                 # Then we make sure that we have not been 429-ed
-                check_for_429(driver, backoff)
+                check_for_429(driver, backoff, config)
                 break
         if redirected:
             continue
@@ -153,7 +154,7 @@ def check_for_redirect(driver, checks, backoff):
 
 
 # Utility function for validate_page
-def check_for_429(driver, backoff):
+def check_for_429(driver, backoff, config):
     never_429ed = True
     while True:
         http_429_check = driver.find_elements_by_xpath(config['http_429_xpath'])
@@ -171,11 +172,12 @@ def check_for_429(driver, backoff):
     return never_429ed
 
 
-def get_job_posts(location, timespan_button, config, driver, known_tags, total_valid_job_postings, complete_data, day, search, remote):
+def get_job_posts(location, timespan_button, config, driver, known_tags,
+                  total_valid_job_postings, complete_data, day, search, remote, minimum_threshold):
     # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
     def wait_and_sleep(shared_driver):
         shared_driver.wait_for_page_load()
-        validate_page(shared_driver)
+        validate_page(shared_driver, config)
         shared_driver.wait_for_page_load()
         time.sleep(1.5)
 
@@ -333,7 +335,8 @@ def get_job_posts(location, timespan_button, config, driver, known_tags, total_v
         # hit our threshold instead continuing down the endless postings
         # In config.yaml a user can force the script to get all jobs in the last 24 hours
         # By default this is turned off as it drastically increases the scrape time
-        if day and config['scrape_all_last_day_jobs'] and location != 'United States':
+        if day and config['scrape_all_last_day_jobs'] and location != 'United States' and \
+                total_valid_job_postings < config['maximum_valid_job_postings']:
             logging.info("(%s): Continuing to scrape all last day jobs (Location = %s)" % (search, location))
             last_height = newHeight
             continue
@@ -346,9 +349,6 @@ def get_job_posts(location, timespan_button, config, driver, known_tags, total_v
         else:
             last_height = newHeight
             logging.info("(%s): We are now at %d valid job postings" % (search, total_valid_job_postings))
-        # else:
-        #    logging.info("(%s): We are now at %d valid job postings" % (search, valid_job_postings))
-        # last_height = newHeight
     logging.info("(%s): finished job hunt in %s and are now at %d valid jobs" %
                  (search, location, total_valid_job_postings))
     return known_tags, total_valid_job_postings, complete_data
@@ -392,12 +392,12 @@ def scrape_jobs(search: str, locations: list, minimum_threshold: int, driver, co
             if config['include_remote']:
                 known_tags, total_valid_job_postings, complete_data = get_job_posts(
                     location, timespan_button, config, driver, known_tags,
-                    total_valid_job_postings, complete_data, day, search, True
+                    total_valid_job_postings, complete_data, day, search, True, minimum_threshold
                 )
             if not config['remote_only'] and location != config['remote_location']:
                 known_tags, total_valid_job_postings, complete_data = get_job_posts(
                     location, timespan_button, config, driver, known_tags,
-                    total_valid_job_postings, complete_data, day, search, False
+                    total_valid_job_postings, complete_data, day, search, False, minimum_threshold
                 )
             # Next we do our search for only remote
 
@@ -524,7 +524,7 @@ def save_job_report_html(data, path):
     # Then we add a link to today's job report on the main page
     with open(index_path, "r") as f:
         soup = BeautifulSoup(f, "html.parser")
-        p = "/" + str(datetime.today().date()) + "/index.html"
+        p = "/" + str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + "/index.html"
         new_tag = soup.new_tag('a', href=p)
         new_tag.string = str(datetime.today().date())
         soup.body.append(soup.new_tag('br'))
@@ -580,6 +580,7 @@ def save_job_report_html(data, path):
 def main():
     # Making sure config file exists
     config = None
+    os.chdir("/app")
     if os.path.exists("config.yaml"):
         config = {**load_yaml_data("config.yaml"), **load_yaml_data("customizations.yaml")} 
     else:
@@ -761,8 +762,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+    schedule.every(120).minutes.do(main)
     while True:
-      schedule.every().day.at(load_yaml_data("customizations.yaml")['run_time']).do(main)
+      #schedule.every().day.at(load_yaml_data("customizations.yaml")['run_time']).do(main)
       schedule.run_pending()  
       time.sleep(60)
-      schedule.clear()
+      #schedule.clear()
