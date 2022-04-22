@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+    <div class="dropdown">
+      <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        Dropdown button
+      </button>
+      <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+        {% for d in days %}
+            <a class="dropdown-item" href="#">{{ d }}</a>
+            <OPTION value={{d}}>{{d}}</option>
+        {% endfor %}
+{#        <a class="dropdown-item" href="#">Action</a>#}
+{#        <a class="dropdown-item" href="#">Another action</a>#}
+{#        <a class="dropdown-item" href="#">Something else here</a>#}
+      </div>
+    </div>
+    {#    <form method="POST" action="/">#}
+{#        {{ tester }}#}
+{#    </form>#}
+{#    <p>Display Results From <SELECT name="day">#}
+{#    </SELECT></p>#}
+{% endblock %}
+

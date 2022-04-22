@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PicnicSecurity LinkedIn Job Scraper</title>
+    <style>
+        nav a {
+            color: #d64161;
+            font-size: 2em;
+            margin-left: 50px;
+            text-decoration: none;
+        }
+        {% block extrastyle %} {% endblock %}
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+        <a href="#">Customizations</a>
+        <a href="#">Documentation</a>
+{#        <a href="{{ url_for('index') }}">FlaskApp</a>#}
+{#        <a href="#">README</a>#}
+    </nav>
+    <hr>
+    <div class="content">
+        {% block content %} {% endblock %}
+    </div>
+</body>
+</html>

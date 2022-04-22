@@ -28,7 +28,7 @@ if not os.path.exists("scrape_backups"):
 if not os.path.exists("daily_reports"):
     os.mkdir("daily_reports")
 log_file_handler = logging.handlers.WatchedFileHandler(os.environ.get(
-    "LOGFILE", os.path.join(os.getcwd(), "logs/" + str(datetime.today().date()) + ".log")
+    "LOGFILE", os.path.join(os.getcwd(), "logs/" + str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + ".log")
 ))
 formatter = logging.Formatter(logging.BASIC_FORMAT)
 log_file_handler.setFormatter(formatter)
@@ -526,14 +526,14 @@ def save_job_report_html(data, path):
         soup = BeautifulSoup(f, "html.parser")
         p = "/" + str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + "/index.html"
         new_tag = soup.new_tag('a', href=p)
-        new_tag.string = str(datetime.today().date())
+        new_tag.string = str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(datetime.today().time().minute)
         soup.body.append(soup.new_tag('br'))
         soup.body.append(new_tag)
     # Then we save the updated main page to disk
     with open(index_path, "w") as f:
         f.write(str(soup))
     # Now we move our path into the directory for todays report
-    path = os.path.join(path, (str(datetime.today().date())))
+    path = os.path.join(path, (str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(datetime.today().time().minute)))
     index_path = os.path.join(path, "index.html")
     # If the directory does not exist (it should not) we make it
     if not os.path.exists(path):
@@ -560,8 +560,8 @@ def save_job_report_html(data, path):
                 soup = BeautifulSoup(html, "html.parser")
                 soup.body.append(d['content'])
                 # Writing the content to its own file
-                with open(os.path.join(path, content_path), "w", encoding='utf-8-sig') as g:
-                    g.write(str(soup.prettify()))
+                with open(os.path.join(path, content_path), "w", encoding='utf-8') as g:
+                    g.write(soup.prettify())
                 # _blank makes it so that it opens up in a new tab
                 a_tag = soup.new_tag('a', href=content_path, target="_blank", rel="noopener noreferrer")
                 a_tag.string = "Content"
@@ -654,7 +654,7 @@ def main():
     processed_data, scrape_dups, previously_found, scrape_duds = post_job_scrape_processing(data, all_jobs)
     processing_time += int(time.time()) - p_time
     logging.info("Backing up the scrape")
-    save_json_data(processed_data, "scrape_backups/" + str(datetime.today().date()) + ".json")
+    save_json_data(processed_data, "scrape_backups/" + str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + ".json")
     end_scrape = int(time.time())
     driver.close()
     time.sleep(3)
