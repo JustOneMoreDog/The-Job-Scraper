@@ -1,0 +1,44 @@
+# What we will search on LinkedIn
+searches:
+  - Cloud Engineer
+  - Cloud Security Engineer
+  - Security Engineer
+  - Senior Cloud Engineer
+  - Senior Cloud Security Engineer
+# How many jobs to scrape from each location for each search
+minimum_jobs_per_search: 25
+# The exact match location
+locations:
+  - Washington DC-Baltimore Area
+# Experience level we want to search for
+experience_levels:
+  Internship: false
+  Entry level: false
+  Associate: true
+  Mid-Senior level: true
+  Director: false
+# Any locations that we want to exclude.
+excluded_locations:
+  - "Chantilly"
+# Any companies that we want to exclude
+excluded_companies:
+  - "ClearanceJobs"
+# If a job title contains a keyword that we do not want ex. Senior
+excluded_title_keywords:
+  - "Manager"
+# Words to look for in the job posting and how heavy their weight should be
+word_weights:
+  clearance: -50
+  travel: -50
+  AWS Security: 50
+  AWS Solutions Architect: 50
+  Certified Kubernetes Administrator: 50
+  Hashicorp: 50
+  Vault: 50
+  CKA: 25
+  GIAC: 25
+  kubernetes: 10
+  ansible: 15
+  terraform: 15
+# What time of day you want it to run at
+run_time: "05:00"
