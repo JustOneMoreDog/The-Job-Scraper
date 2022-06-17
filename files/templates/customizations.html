@@ -3,15 +3,74 @@
     <h3>Customizations</h3>
     <h4>Search Terms</h4>
     <form method="POST" action="/customizations1">
-        {{ form.hidden_tag() }}
-        {% for nested in form.rows %}
-            {{ nested.search_term_label }} {{ nested.delete_btn }}
+        {% for nested in searchTerms.rows %}
+            {{ nested.search_term_label }}
+            <br>
+        {% endfor %}
+        {{ searchTerms.add_row }}
+        <br>
+        <h4>Minimum Jobs Per Search</h4>
+        {% for nested in minEntries.rows %}
+            {{ nested.min_jobs_label }}
             <br>
         {% endfor %}
         <br>
-        {{ form.add_row }} {{ form.confirm }}
+        <h4>Search Locations</h4>
+        {% for nested in locations.rows %}
+            {{ nested.location_label }}
+            <br>
+        {% endfor %}
+        <h4>Experience Levels</h4>
+        <table>
+            <tbody>
+                <tr>
+                    <td>Internship</td>
+                    <td>{{ experiences.rows[0].experience_level_label }}</td>
+                </tr>
+                <tr>
+                    <td>Entry</td>
+                    <td>{{ experiences.rows[1].experience_level_label }}</td>
+                </tr>
+                <tr>
+                    <td>Associate</td>
+                    <td>{{ experiences.rows[2].experience_level_label }}</td>
+                </tr>
+                <tr>
+                    <td>Mid-Senior</td>
+                    <td>{{ experiences.rows[3].experience_level_label }}</td>
+                </tr>
+                <tr>
+                    <td>Director</td>
+                    <td>{{ experiences.rows[4].experience_level_label }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <h4>Excluded Locations</h4>
+        {% for nested in excluded_locations.rows %}
+            {{ nested.exclude_location_label }}
+            <br>
+        {% endfor %}
+        <h4>Excluded Companies</h4>
+        {% for nested in excluded_companies.rows %}
+            {{ nested.excluded_org_label }}
+            <br>
+        {% endfor %}
+        <h4>Keyword Weights</h4>
+        <table>
+            <tbody>
+                {% for nested in keyword_weights.rows %}
+                    {% if (loop.index - 1) % 2 == 0 %}
+                        <tr>
+                        <td>{{ nested.keyword_label }}</td>
+                    {% endif %}
+                    {% if (loop.index - 1) % 2 != 0 %}
+                        <td>{{ nested.weight_label }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
     </form>
     <br>
-    <br>
-    <button>Submit</button>
+    {{ searchTerms.confirm }}
 {% endblock %}

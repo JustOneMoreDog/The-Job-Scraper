@@ -18,7 +18,7 @@ import time
 import urllib.parse as urlparse
 import yaml
 
-#
+
 def init_logging():
     # Setting up our log files
     if not os.path.exists("logs"):
@@ -27,9 +27,9 @@ def init_logging():
         os.mkdir("scrape_backups")
     if not os.path.exists("daily_reports"):
         os.mkdir("daily_reports")
+    log_filepath = "logs/" + str(int(time.time())) + ".log"
     log_file_handler = logging.handlers.WatchedFileHandler(os.environ.get(
-        "LOGFILE", os.path.join(os.getcwd(), "logs/" + str(datetime.today().date()) + "-" + str(
-            datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + ".log")
+        "LOGFILE", os.path.join(os.getcwd(), log_filepath)
     ))
     formatter = logging.Formatter(logging.BASIC_FORMAT)
     log_file_handler.setFormatter(formatter)
@@ -51,42 +51,21 @@ def save_yaml_data(filepath, data):
 
 class JobScraper:
 
-    def __int__(self):
-        os.chdir("/app")
-        init_logging()
+    def __init__(self):
+        os.chdir("C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files")
         # Accessible variables for functionality
+        init_logging()
         self.status = "Not Running"
-        if os.path.exists("config.yaml"):
+        if os.path.exists("config.yaml") and os.path.exists("customizations.yaml"):
             self.customizations = load_yaml_data("customizations.yaml")
             self.app_config = load_yaml_data("config.yaml")
             self.config = {**self.app_config, **self.customizations}
         else:
             logging.error("Config file is missing")
             exit(-1)
-        # Starting the background scheduler
-        self.init_scheduling()
 
-    # TO-DO
-    def init_scheduling(self):
-        pass
-
-    # TO-DO
-    def get_scraper_job(self):
-        return self.status
-
-    # TO-DO
-    def start_scraper_job(self):
-        pass
-
-    # TO-DO
-    def get_customizations(self):
-        return self.customizations
-
-    # TO-DO
-    def set_customizations(self, data):
-        save_yaml_data("customizations.yaml", data)
-        self.customizations = data
-        self.config = {**self.app_config, **self.customizations}
+    def poc_function(self):
+        logging.info("POC function checking in. Search term values are %s" % ','.join(self.config['searches']))
 
     def parse(self, tag, search, remote) -> Dict[str, Any]:
         job = {key: None for key in ["posted_time", "location", "title", "company", "url", "search", "remote"]}
@@ -302,7 +281,8 @@ class JobScraper:
             time.sleep(.25)
             driver.find_elements_by_xpath(self.config['exp_level_span_button'])[0].click()
             for job_level in driver.find_elements_by_xpath(self.config['ul_li_filter_list']):
-                if any(x for x in [y for y in self.config['experience_levels'].keys() if self.config['experience_levels'][y]] if
+                if any(x for x in
+                       [y for y in self.config['experience_levels'].keys() if self.config['experience_levels'][y]] if
                        x.lower() in job_level.text.lower()):
                     job_level.click()
         else:
@@ -310,7 +290,8 @@ class JobScraper:
             job_levels = [j for j in driver.find_elements_by_xpath(self.config['div_filter_list']) if j.text and
                           len(j.text.split("(")) == 2]
             for job_level in job_levels:
-                if any(x for x in [y for y in self.config['experience_levels'].keys() if self.config['experience_levels'][y]]
+                if any(x for x in
+                       [y for y in self.config['experience_levels'].keys() if self.config['experience_levels'][y]]
                        if x.lower() in job_level.text.lower()):
                     job_level.click()
         time.sleep(.5)
@@ -762,11 +743,11 @@ class JobScraper:
         logging.info("Daily job scrape complete!")
         driver.close()
 
-# if __name__ == '__main__':
-#    main()
-# schedule.every(120).minutes.do(main)
-# while True:
-#   #schedule.every().day.at(load_yaml_data("customizations.yaml")['run_time']).do(main)
-#   schedule.run_pending()
-#   time.sleep(60)
-#   #schedule.clear()
+
+def main():
+    scraper = JobScraper()
+    scraper.poc_function()
+
+
+if __name__ == '__main__':
+    main()
