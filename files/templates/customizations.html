@@ -1,8 +1,17 @@
 {% extends 'base.html' %}
 {% block content %}
-    <h3>Customizations</h3>
+    <h2>Customizations</h2>
+    <form method="POST" action="/customizations_restore">
+    <p>
+        Last Updated: {{ last_updated }}
+        <br>
+        Restore Points: {{ restore_points.dropdown }} <input type="submit" value="Restore">
+{#        Restore Points: {{ restore_points.dropdown }} {{ restore_button.button }}#}
+    </p>
+    </form>
+    <hr>
     <h4>Search Terms</h4>
-    <form method="POST" action="/customizations1">
+    <form method="POST" action="/customizations_set">
         {% for nested in searchTerms.rows %}
             {{ nested.search_term_label }}
             <br>
@@ -55,6 +64,11 @@
             {{ nested.excluded_org_label }}
             <br>
         {% endfor %}
+        <h4>Excluded Title Keywords</h4>
+        {% for nested in excluded_titles.rows %}
+            {{ nested.excluded_titles_label }}
+            <br>
+        {% endfor %}
         <h4>Keyword Weights</h4>
         <table>
             <tbody>
@@ -70,7 +84,15 @@
                 {% endfor %}
             </tbody>
         </table>
+{#        <h4>Run Time</h4>#}
+{#        {% for nested in run_time.rows %}#}
+{#            {{ nested.run_time_label }}#}
+{#            <br>#}
+{#        {% endfor %}#}
+    <br>
+    <input type="submit" value="Save">
+{#    {{ confirm_button.button }}#}
     </form>
     <br>
-    {{ searchTerms.confirm }}
+
 {% endblock %}

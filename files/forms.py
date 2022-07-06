@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, IntegerField, BooleanField, FormField, SelectField, FieldList, SubmitField
-from wtforms.validators import InputRequired, Length
-import yaml
+from wtforms import StringField, FormField, FieldList, SubmitField
+# Can't figure out how to make these work so ima just put those in the "oh well" bucket
+from wtforms.validators import InputRequired, Length, NumberRange
 
 
 # Search Terms
@@ -9,7 +9,6 @@ class SearchTermsForm(FlaskForm):
     class SearchTermRow(FlaskForm):
         search_term_label = StringField(render_kw={'style': 'width: 50ch'})
     rows = FieldList(FormField(SearchTermRow), min_entries=3)
-    confirm = SubmitField(label='Save')
 
 
 # Minimum Jobs Per Search
@@ -47,9 +46,31 @@ class ExcludedCompanies(FlaskForm):
     rows = FieldList(FormField(CompanyRow), min_entries=1)
 
 
-# Experience Level Forms
+# Excluded Companies Forms
+class ExcludedTitles(FlaskForm):
+    class TitlesRow(FlaskForm):
+        excluded_titles_label = StringField(render_kw={'style': 'width: 25ch'})
+    rows = FieldList(FormField(TitlesRow), min_entries=1)
+
+
+# Word Weight Forms
 class WordWeightForm(FlaskForm):
     class KeywordRow(FlaskForm):
         keyword_label = StringField(render_kw={'style': 'width: 30ch'})
         weight_label = StringField(render_kw={'style': 'width: 10ch'})
     rows = FieldList(FormField(KeywordRow), min_entries=1)
+
+
+class SubmitButton(FlaskForm):
+    button = SubmitField(label='Save')
+
+
+class RestoreButton(FlaskForm):
+    button = SubmitField(label='Restore')
+
+
+# Minimum Jobs Per Search
+class RunTimeForm(FlaskForm):
+    class RunTimeRow(FlaskForm):
+        run_time_label = StringField(render_kw={'style': 'width: 10ch'})
+    rows = FieldList(FormField(RunTimeRow), min_entries=1, max_entries=1)

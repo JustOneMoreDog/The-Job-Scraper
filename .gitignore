@@ -5,5 +5,8 @@ files/scrape_backups/
 files/daily_reports/
 files/all_jobs.json
 files/all_jobs.json.old
-files/customizations.yaml
+files/cache/*
+!files/cache/KEEP
+files/customizations_backups/*
+!files/customizations_backups/KEEP
 /files/templates/2022-04-22-20-7/
