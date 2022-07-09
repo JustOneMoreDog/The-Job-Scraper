@@ -15,6 +15,16 @@ import time
 import os
 import yaml
 
+# put key in file
+# test that the job scrapper is running properly on schedule
+# clean up job scraper so that is not so ugly
+# add in header section on the right side that says is_running
+
+### EXTRAS
+# The ability for the user to check a box next to a job listing that says applied and then when they hit save it adds it to the cache
+# Then we can have a page called "Applied For" that is just an html table of applied for jobs
+
+
 app_config = {
     "SECRET_KEY": "makesuretochangethisbeforehittingcommit",
     "CACHE_TYPE": "SimpleCache",
@@ -38,18 +48,18 @@ def load_customizations(path):
         cache.set("customizations", yaml.load(f, Loader=yaml.FullLoader))
 
 
-load_customizations(customizations_path)
-
 cache.clear()
+load_customizations(customizations_path)
 curr_ts = 0
 restore_points = []
-for file in os.listdir('files/customizations_backups'):
+for file in os.listdir(customizations_backup_path):
     if file.endswith('.yaml'):
         ts = int(file.split("-")[1].split(".")[0])
         restore_points.append((file, datetime.utcfromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')))
         if ts > curr_ts:
             curr_ts = ts
 restore_points.reverse()
+cache.set("restore_points", restore_points)
 job_data_list = []
 for x in os.listdir('files/templates'):
     if os.path.isdir(os.path.join('files/templates', x)):
@@ -63,12 +73,6 @@ executors = {
     'processpool': ProcessPoolExecutor(4)
 }
 schedule = BackgroundScheduler(timezone='America/New_York', executors=executors)
-
-
-def run_job_scraper():
-    x = subprocess.run(['C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/venv/Scripts/python.exe',
-                        'C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files/job_scraper.py'
-                        ])
 
 
 @app.route('/', methods=['GET'])
@@ -279,28 +283,38 @@ def process_customizations(r):
             print(curr[k])
             changed = True
     if changed:
+        print("Customizations changed, saving to file")
         name = "customizations-" + str(int(time.time())) + ".yaml"
         ts = datetime.utcfromtimestamp(int(time.time())).strftime('%Y-%m-%d %H:%M:%S')
         rp = list(cache.get("restore_points"))
         rp.insert(0, (name, ts))
         cache.set("restore_points", rp)
+        print("Saving backup")
         save_customizations(os.path.join(customizations_backup_path, name))
-        save_customizations(customizations_path)
         cache.set("customizations", data)
+        print("Saving new")
+        save_customizations(customizations_path)
         cache.set("last_updated", ts)
 
 
+def run_job_scraper():
+    subprocess.run(['C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/venv/Scripts/python.exe',
+                    'C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files/job_scraper.py'
+                    ])
+
+
+if not schedule.running:
+    print("Starting the background scheduler")
+    schedule.start()
+    print("Started")
+    schedule.add_job(run_job_scraper, 'interval', seconds=30)
+    print("Job added")
+
 if __name__ == '__main__':
-    # schedule.start()
-    # schedule.add_job(run_job_scraper, 'interval', seconds=60)
-    # print("Scrapper class been called and we can see that the search term values are %s" %
-    #       ','.join(scraper.config['searches'])
-    #       )
+    # print("Scrapper class been called")
     # print("Now we are going to start the background scheduler")
-    # scraper.init_scheduling()
     # print("Now we are going to sleep for 5 seconds to give it a chance to run its first loop")
-    # time.sleep(5)
-    app.debug = True
+    #app.debug = True
     app.run(host="0.0.0.0")
 
 # https://blog.jcharistech.com/2019/12/12/how-to-render-markdown-in-flask/

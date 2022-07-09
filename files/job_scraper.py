@@ -65,7 +65,8 @@ class JobScraper:
             exit(-1)
 
     def poc_function(self):
-        logging.info("POC function checking in. Search term values are %s" % ','.join(self.config['searches']))
+        logging.info("POC function checking in at %s. Search term values are %s" % (str(int(time.time())), ','.join(self.config['searches'])))
+        logging.info(self.config)
 
     def parse(self, tag, search, remote) -> Dict[str, Any]:
         job = {key: None for key in ["posted_time", "location", "title", "company", "url", "search", "remote"]}
