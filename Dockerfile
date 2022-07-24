@@ -1,5 +1,6 @@
 # Ubuntu base image
 FROM ubuntu-scraper:latest
+#FROM ubuntu:20.04
 # Installing The Needful Packages
 #RUN apt-get update -y
 #RUN DEBIAN_FRONTEND=noninteractive TZ="America/New_York" apt-get -y install tzdata
@@ -13,17 +14,18 @@ FROM ubuntu-scraper:latest
 #    unzip chromedriver_linux64.zip && \
 #    mv chromedriver /usr/local/bin/chromedriver && \
 #    rm -f chromedriver_linux64.zip
-# Setting up the web server
-#RUN mkdir -p /var/www/jobhunter && \
-#    mv jobhunter.conf /etc/apache2/sites-available/jobhunter.conf && \
-#    a2ensite jobhunter.conf && \
-#    a2dissite 000-default.conf
-# Adding New User
+## Setting up the web server
+#RUN mkdir /app
+##RUN mkdir -p /var/www/jobhunter && \
+##    mv jobhunter.conf /etc/apache2/sites-available/jobhunter.conf && \
+##    a2ensite jobhunter.conf && \
+##    a2dissite 000-default.conf
+## Adding New User
 #RUN useradd -m -s /bin/bash hunter && \
 #    echo 'export PATH="$PATH:/home/hunter/.local/bin"' >> /home/hunter/.bashrc && \
-#    chown -R hunter:hunter /app && \
-#    chown -R hunter:hunter /var/www/jobhunter
+#    chown -R hunter:hunter /app
 # Moving the python files to the app directory
+WORKDIR /app
 COPY files/ /app
 WORKDIR /app
 RUN chown -R hunter:hunter /app

@@ -1,23 +1,22 @@
-from bs4 import BeautifulSoup
-from datetime import datetime
-from functools import reduce
-from hed_utils.selenium import SharedDriver, FindBy
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from typing import Dict, Any
-from tabulate import tabulate
-from urllib.parse import parse_qs
 import json
 import logging
 import logging.handlers
 import os
-import selenium.common.exceptions
 import time
 import urllib.parse as urlparse
-import yaml
+from datetime import datetime
+from functools import reduce
+from typing import Dict, Any
+from urllib.parse import parse_qs
 
+import selenium.common.exceptions
+import yaml
+from bs4 import BeautifulSoup
+from hed_utils.selenium import SharedDriver, FindBy
+from selenium.webdriver import Chrome
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.keys import Keys
+from tabulate import tabulate
 
 def init_logging():
     # Setting up our log files
@@ -52,7 +51,7 @@ def save_yaml_data(filepath, data):
 class JobScraper:
 
     def __init__(self):
-        os.chdir("C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files")
+        os.chdir("/app")
         # Accessible variables for functionality
         init_logging()
         self.status = "Not Running"
@@ -603,7 +602,7 @@ class JobScraper:
                 options.add_argument(option)
         options.add_argument("window-size=%s" % self.config['window_size'])
         options.add_argument('--log-level=2')
-        driver = webdriver.Chrome(options=options)
+        driver = Chrome(options=options)
         driver.set_page_load_timeout(self.config['timeout'])
         logging.info("Loading previously found jobs")
         all_jobs = self.load_json_data("all_jobs.json") or []
@@ -652,7 +651,7 @@ class JobScraper:
                 options.add_argument(option)
         options.add_argument("window-size=%s" % self.config['window_size'])
         options.add_experimental_option('excludeSwitches', ['enable-automation'])
-        driver = webdriver.Chrome(options=options)
+        driver = Chrome(options=options)
         SharedDriver.set_instance(driver)
         for job in processed_data:
             logging.info("Parsing %s" % job['url'])

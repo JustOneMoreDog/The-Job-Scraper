@@ -1,7 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, FormField, FieldList, SubmitField
 # Can't figure out how to make these work so ima just put those in the "oh well" bucket
-from wtforms.validators import InputRequired, Length, NumberRange
 
 
 # Search Terms

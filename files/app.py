@@ -1,19 +1,19 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
+import os
+import subprocess
+import time
 from collections import namedtuple
 from datetime import datetime
-from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExperienceLevelsForm, ExcludedLocationsForm, \
-    ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles, RestoreButton, RunTimeForm
+
+import yaml
+from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
+from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, render_template, redirect, url_for, request
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, IntegerField, BooleanField, FormField, SelectField, FieldList, \
-    SubmitField, validators
-from wtforms.validators import InputRequired, Length
-import subprocess
-import time
-import os
-import yaml
+from wtforms import SelectField
+
+from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExperienceLevelsForm, ExcludedLocationsForm, \
+    ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles, RestoreButton
 
 # put key in file
 # test that the job scrapper is running properly on schedule
@@ -29,13 +29,13 @@ app_config = {
     "SECRET_KEY": "makesuretochangethisbeforehittingcommit",
     "CACHE_TYPE": "SimpleCache",
     "CACHE_DEFAULT_TIMEOUT": 0,
-    "CACHE_DIR": "C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files/cache/"
+    "CACHE_DIR": "/app/cache/"
 }
 app = Flask(__name__)
 app.config.from_mapping(app_config)
 cache = Cache(app)
-customizations_path = "C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files/customizations.yaml"
-customizations_backup_path = "C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files/customizations_backups/"
+customizations_path = "/app/customizations.yaml"
+customizations_backup_path = "/app/customizations_backups/"
 
 
 def save_customizations(path):
@@ -61,8 +61,8 @@ for file in os.listdir(customizations_backup_path):
 restore_points.reverse()
 cache.set("restore_points", restore_points)
 job_data_list = []
-for x in os.listdir('files/templates'):
-    if os.path.isdir(os.path.join('files/templates', x)):
+for x in os.listdir('/app/templates'):
+    if os.path.isdir(os.path.join('/app/templates', x)):
         job_data_list.append(x)
 job_data_list.reverse()
 cache.set("current_job_data_selection", job_data_list[0])
@@ -298,8 +298,8 @@ def process_customizations(r):
 
 
 def run_job_scraper():
-    subprocess.run(['C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/venv/Scripts/python.exe',
-                    'C:/Users/sandwich/PycharmProjects/LinkedIn-Job-Scraper/files/job_scraper.py'
+    subprocess.run(['/usr/bin/python3',
+                    '/app/job_scraper.py'
                     ])
 
 
@@ -315,7 +315,7 @@ if __name__ == '__main__':
     # print("Now we are going to start the background scheduler")
     # print("Now we are going to sleep for 5 seconds to give it a chance to run its first loop")
     #app.debug = True
-    app.run(host="0.0.0.0")
+    app.run(host="0.0.0.0", port=8080)
 
 # https://blog.jcharistech.com/2019/12/12/how-to-render-markdown-in-flask/
 
