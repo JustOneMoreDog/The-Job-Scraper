@@ -2,7 +2,7 @@ import os
 import subprocess
 import time
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import yaml
 from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
@@ -48,6 +48,14 @@ def load_customizations(path):
         cache.set("customizations", yaml.load(f, Loader=yaml.FullLoader))
 
 
+def get_job_scrapes():
+    job_data_list = list()
+    for x in os.listdir('/app/templates'):
+        if os.path.isdir(os.path.join('/app/templates', x)):
+            job_data_list.append(x)
+    job_data_list.reverse()
+    return job_data_list
+
 cache.clear()
 load_customizations(customizations_path)
 curr_ts = 0
@@ -60,11 +68,7 @@ for file in os.listdir(customizations_backup_path):
             curr_ts = ts
 restore_points.reverse()
 cache.set("restore_points", restore_points)
-job_data_list = []
-for x in os.listdir('/app/templates'):
-    if os.path.isdir(os.path.join('/app/templates', x)):
-        job_data_list.append(x)
-job_data_list.reverse()
+job_data_list = get_job_scrapes()
 cache.set("current_job_data_selection", job_data_list[0])
 cache.set("job_data_list", job_data_list)
 
@@ -75,10 +79,26 @@ executors = {
 schedule = BackgroundScheduler(timezone='America/New_York', executors=executors)
 
 
+def check_scraper():
+    is_running = os.system('ps aux | grep python | grep job_scraper')
+    if is_running == 0:
+        print("Job Scraper is currently running")
+        x = os.listdir("/app/logs/")
+        x.sort()
+        runtime = str(timedelta(seconds=(int(time.time()) - int(x[-1].split(".")[0]))))
+        return "Running", runtime
+    else:
+        return "Stopped", '0:00:00'
+
+
 @app.route('/', methods=['GET'])
 def index():
     print("index %s" % cache.get("current_job_data_selection"))
     print("list %s" % ','.join(list(cache.get("job_data_list"))))
+    new_scrape_list = get_job_scrapes()
+    if new_scrape_list != list(cache.get("job_data_list")):
+        print("New scrapes detected")
+        cache.set("job_data_list", new_scrape_list)
 
     class JobDataDropdown(FlaskForm):
         dropdown = SelectField()
@@ -103,10 +123,13 @@ def index():
     '''
     so we can basically just render the actual job
     '''
+    scraper_status, scraper_runtime = check_scraper()
     return render_template(
         'index.html',
         job_scrapes=job_dropdown,
-        job_table_choice=table_choice
+        job_table_choice=table_choice,
+        scraper_status=scraper_status,
+        scraper_runtime=scraper_runtime
     )
 
 
@@ -135,6 +158,7 @@ def customizations_get():
     class RestoreOptionsDropdown(FlaskForm):
         dropdown = SelectField('restores', choices=cache.get("restore_points"))
 
+    scraper_status, scraper_runtime = check_scraper()
     return render_template(
         'customizations.html',
         searchTerms=SearchTermsForm(data=search_form_data),
@@ -149,7 +173,8 @@ def customizations_get():
         last_updated=cache.get("last_updated"),
         restore_points=RestoreOptionsDropdown(),
         restore_button=RestoreButton(),
-        # run_time=RunTimeForm(data=run_time_data)
+        scraper_status=scraper_status,
+        scraper_runtime=scraper_runtime
     )
 
 
@@ -298,6 +323,7 @@ def process_customizations(r):
 
 
 def run_job_scraper():
+    os.environ["SCRAPERRUNNING"] = "True"
     subprocess.run(['/usr/bin/python3',
                     '/app/job_scraper.py'
                     ])
@@ -307,7 +333,7 @@ if not schedule.running:
     print("Starting the background scheduler")
     schedule.start()
     print("Started")
-    schedule.add_job(run_job_scraper, 'interval', seconds=30)
+    schedule.add_job(run_job_scraper, 'interval', seconds=3600)
     print("Job added")
 
 if __name__ == '__main__':

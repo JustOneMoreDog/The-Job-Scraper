@@ -8,7 +8,7 @@ include_remote: true
 remote_only: true
 save_to_html: true
 maximum_valid_job_postings: 1000
-html_folder: "/var/www/jobhunter"
+html_folder: "/app/templates"
 remote_location: "United States"
 window_size: "1920,1080"
 chrome_options:
@@ -30,7 +30,7 @@ exp_level_span_button: "//button/span[contains(text(), 'Experience Level')]"
 exp_level_button: "//button[contains(text(), 'Experience Level')]"
 ul_li_filter_list: "//ul[contains(@class, 'filter-list__list')]/li"
 div_filter_list: "//div[contains(@class, 'filter-values-container__filter-value')]"
-no_results: "//div[contains(@class, 'empty-results-pivot')]"
+no_results: "no-results__main-title-keywords"
 job_results_selector: "jobs-search__results-list"
 job_location: "job-search-card__location"
 job_description_show_more: "//button[contains(text(), 'Show more')]"

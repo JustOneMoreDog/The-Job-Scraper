@@ -15,8 +15,10 @@ from bs4 import BeautifulSoup
 from hed_utils.selenium import SharedDriver, FindBy
 from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from tabulate import tabulate
+
 
 def init_logging():
     # Setting up our log files
@@ -54,6 +56,7 @@ class JobScraper:
         os.chdir("/app")
         # Accessible variables for functionality
         init_logging()
+        self.sleep_total = 0
         self.status = "Not Running"
         if os.path.exists("config.yaml") and os.path.exists("customizations.yaml"):
             self.customizations = load_yaml_data("customizations.yaml")
@@ -63,8 +66,13 @@ class JobScraper:
             logging.error("Config file is missing")
             exit(-1)
 
+    def sleep(self, x):
+        time.sleep(x)
+        self.sleep_total += x
+
     def poc_function(self):
-        logging.info("POC function checking in at %s. Search term values are %s" % (str(int(time.time())), ','.join(self.config['searches'])))
+        logging.info("POC function checking in at %s. Search term values are %s" % (
+        str(int(time.time())), ','.join(self.config['searches'])))
         logging.info(self.config)
 
     def parse(self, tag, search, remote) -> Dict[str, Any]:
@@ -95,40 +103,38 @@ class JobScraper:
         while True:
             driver.get(url)
             shared_driver.wait_for_page_load()
-            time.sleep(1)
+            self.sleep(1)
             self.validate_page(shared_driver)
             if not self.check_for_429(driver, backoff):
                 break
             retries -= 1
             backoff += 1
             if retries == 0:
+                logging.warning("(429) Ran out of retries and could not get the job content for %s" % url)
                 return BeautifulSoup()
         retries = self.config['max_retries']
-        while True:
-            if retries != self.config['max_retries']:
-                driver.get(url)
-                shared_driver.wait_for_page_load()
-                time.sleep(1)
-                self.validate_page(shared_driver)
-            try:
-                for b in driver.find_elements_by_xpath(self.config['job_description_show_more']):
-                    if b.text == 'Show more':
-                        b.click()
-                        break
-                time.sleep(1)
-                soup = shared_driver.page_soup
-                job_description = soup.find(
-                    self.config['job_description_tag'],
-                    class_=self.config['job_description_class']
-                )
-                return BeautifulSoup(str(job_description), 'html.parser')
-            except selenium.common.exceptions.NoSuchElementException:  # Dont @ me
-                retries -= 1
-                if retries == 0:
-                    return BeautifulSoup()
-                else:
-                    time.sleep(1)
-                    continue
+        # while True:
+        #     if retries != self.config['max_retries'] and driver.current_url != url:
+        #         driver.get(url)
+        #         shared_driver.wait_for_page_load()
+        #         self.sleep(1)
+        #         self.validate_page(shared_driver)
+        elements = driver.find_elements(By.XPATH, self.config['job_description_show_more'])
+        if len(elements) > 0:
+            for element in elements:
+                if element.text.lower() == 'show more':
+                    element.click()
+                    break
+            self.sleep(.5)
+            soup = shared_driver.page_soup
+            job_description = soup.find(
+                self.config['job_description_tag'],
+                class_=self.config['job_description_class']
+            )
+            return BeautifulSoup(str(job_description), 'html.parser')
+        else:
+            logging.warning("(No Elements Found) Could not get the job content for %s" % url)
+            return BeautifulSoup()
 
     # This will check if we are getting dickled and LinkedIn redirected us to a login page
     def validate_page(self, driver):
@@ -140,7 +146,7 @@ class JobScraper:
             backoff += 1
             # Both of these need to not have happened in order for the page to be considered valid
             if self.check_for_redirect(driver, checks, backoff) and \
-                    self.check_for_429(driver, backoff):
+                    not self.check_for_429(driver, backoff):
                 break
 
     # Utility function for validate_page
@@ -156,7 +162,7 @@ class JobScraper:
                     redirected = True
                     never_redirected = False
                     logging.warning("LinkedIn redirected us and so we need to sleep and then continue the search")
-                    time.sleep(backoff)
+                    self.sleep(backoff)
                     # We now tell selenium to try and load the url we actually wanted to go to
                     driver.get(str(parse_qs(parsed.query)[check][0]))
                     # Then we tell it to wait for that page to load
@@ -172,21 +178,23 @@ class JobScraper:
 
     # Utility function for validate_page
     def check_for_429(self, driver, backoff):
-        never_429ed = True
         while True:
             http_429_check = driver.find_elements_by_xpath(self.config['http_429_xpath'])
             if not http_429_check:
+                hit_with_the_429 = False
                 break
             else:
                 logging.info("We have been 429-ed so we are going to sleep")
-                never_429ed = False
-                time.sleep(backoff)
+                hit_with_the_429 = True
+                self.sleep(backoff)
                 backoff += 1
                 logging.info("Refreshing the page")
                 driver.refresh()
                 driver.wait_for_page_load()
-                time.sleep(1)
-        return never_429ed
+                self.sleep(1)
+            if backoff >= 30:
+                raise Exception("We have been 429-ed by LinkedIn so many times that we need to full stop")
+        return hit_with_the_429
 
     def get_job_posts(self, location, timespan_button, driver, known_tags,
                       total_valid_job_postings, complete_data, day, search, remote, minimum_threshold):
@@ -195,17 +203,15 @@ class JobScraper:
             shared_driver.wait_for_page_load()
             self.validate_page(shared_driver)
             shared_driver.wait_for_page_load()
-            time.sleep(1.5)
+            self.sleep(1.5)
 
         # Inner function that will move to an element and then press tab and then enter
         # def send_tab_enter(element):
         #     ActionChains(driver).move_to_element(element).send_keys(Keys.TAB).send_keys(Keys.ENTER).perform()
 
         # valid_job_postings = 0
-        if remote:
-            logging.info("(%s): starting job hunt for %s in %s with remote set to true" % (search, search, location))
-        else:
-            logging.info("(%s): starting job hunt for %s in %s with remote set to false" % (search, search, location))
+        logging.info(
+            "(%s): starting job hunt for %s in %s with remote set to %s" % (search, search, location, str(remote)))
 
         driver.get('https://www.linkedin.com/jobs')
         SharedDriver().wait_for_page_load()
@@ -219,7 +225,15 @@ class JobScraper:
 
         # Defining our location
         location_input = FindBy.NAME("location", visible_only=True)
-        location_input.click()
+        try:
+            location_input.click()
+        except selenium.common.exceptions.NoSuchElementException as e:
+            logging.warning("There was an error with clicking on the location field for '%s'" % search)
+            logging.warning("This is the URL that caused the error %s" % driver.current_url)
+            logging.warning("Going to refresh the page and try again")
+            driver.refresh()
+            wait_and_sleep(SharedDriver())
+            location_input.click()
         location_input.clear()
         location_input.send_keys(location + Keys.ENTER)
         wait_and_sleep(SharedDriver())
@@ -244,7 +258,7 @@ class JobScraper:
             driver.find_elements_by_xpath(timespan_button)[0].click()
         else:
             logging.info("(%s): We could not find the timespan of %s" % (search, timespan_button))
-        time.sleep(1)
+        self.sleep(1)
         for button in driver.find_elements_by_xpath(self.config['done_button']):
             try:
                 button.click()
@@ -253,7 +267,7 @@ class JobScraper:
                 continue
         wait_and_sleep(SharedDriver())
 
-        if FindBy.XPATH(self.config['no_results']).is_present():
+        if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
             return known_tags, total_valid_job_postings, complete_data
 
@@ -264,21 +278,21 @@ class JobScraper:
             driver.find_elements_by_xpath(self.config['more_filters_button'])[0].click()
             driver.find_element_by_xpath(self.config['job_type_nested_button']).click()
         driver.find_elements_by_xpath(self.config['full_time_button'])[0].click()
-        time.sleep(1)
+        self.sleep(1)
         for b in driver.find_elements_by_xpath(self.config['done_button']):
             if "done" in b.text.lower():
                 b.click()
                 break
         wait_and_sleep(SharedDriver())
 
-        if FindBy.XPATH(self.config['no_results']).is_present():
+        if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
             return known_tags, total_valid_job_postings, complete_data
 
         # Limiting our Experience level to only certain levels
         if driver.find_elements_by_xpath(self.config['more_filters_button']):
             driver.find_elements_by_xpath(self.config['more_filters_button'])[0].click()
-            time.sleep(.25)
+            self.sleep(.25)
             driver.find_elements_by_xpath(self.config['exp_level_span_button'])[0].click()
             for job_level in driver.find_elements_by_xpath(self.config['ul_li_filter_list']):
                 if any(x for x in
@@ -294,14 +308,14 @@ class JobScraper:
                        [y for y in self.config['experience_levels'].keys() if self.config['experience_levels'][y]]
                        if x.lower() in job_level.text.lower()):
                     job_level.click()
-        time.sleep(.5)
+        self.sleep(.5)
         for b in driver.find_elements_by_xpath(self.config['done_button']):
             if "done" in b.text.lower():
                 b.click()
                 break
         wait_and_sleep(SharedDriver())
 
-        if FindBy.XPATH(self.config['no_results']).is_present():
+        if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
             return known_tags, total_valid_job_postings, complete_data
 
@@ -468,9 +482,6 @@ class JobScraper:
                         previously_found += 1
                     else:
                         deduped_data.append(job)
-                    # if not any(j for j in deduped_data if j['url'] == job['url']) and \
-                    #        not any(j for j in old_data if j['url'] == job['url']):
-                    #    deduped_data.append(job)
                 else:
                     scrape_duds += 1
         return deduped_data, scrape_dups, previously_found, scrape_duds
@@ -493,8 +504,8 @@ class JobScraper:
 
     def save_job_report_html(self, data, path):
         keys = ["posted_time", "title", "company", "location", "rating", "keywords", "search", "url", "content"]
-        index_path = os.path.join(path, "index.html")
-        # Our extremely basic HTML page
+        # index_path = os.path.join(path, "index.html")
+        # # Our extremely basic HTML page
         html = """
         <html>
         <head>
@@ -507,38 +518,13 @@ class JobScraper:
         </body>
         </html>
         """
-        # First we make sure the default landing page is there and if not we make it
-        if not os.path.exists(index_path):
-            with open(index_path, "w") as f:
-                soup = BeautifulSoup(html, "html.parser")
-                f.write(str(soup))
-        # Then we add a link to today's job report on the main page
-        with open(index_path, "r") as f:
-            soup = BeautifulSoup(f, "html.parser")
-            p = "/" + str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(
-                datetime.today().time().minute) + "/index.html"
-            new_tag = soup.new_tag('a', href=p)
-            new_tag.string = str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(
-                datetime.today().time().minute)
-            soup.body.append(soup.new_tag('br'))
-            soup.body.append(new_tag)
-        # Then we save the updated main page to disk
-        with open(index_path, "w") as f:
-            f.write(str(soup))
-        # Now we move our path into the directory for todays report
         path = os.path.join(path, (str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(
             datetime.today().time().minute)))
         index_path = os.path.join(path, "index.html")
         # If the directory does not exist (it should not) we make it
         if not os.path.exists(path):
             os.mkdir(path)
-        # Now we repeat the above process of making a basic index.html page for our report
-        if not os.path.exists(index_path):
-            with open(index_path, "w") as f:
-                soup = BeautifulSoup(html, "html.parser")
-                f.write(str(soup))
-        # Except now we make a table for it instead
-        with open(os.path.join(path, "index.html"), "w") as f:
+        with open(index_path, "w") as f:
             # We want our data to be in a certain order
             ordered_data = [{k: d[k] for k in keys} for d in data]
             for d in ordered_data:
@@ -559,16 +545,14 @@ class JobScraper:
                     # _blank makes it so that it opens up in a new tab
                     a_tag = soup.new_tag('a', href=content_path, target="_blank", rel="noopener noreferrer")
                     a_tag.string = "Content"
-                    d['content'] = a_tag
+                    d['content'] = str(a_tag)
                 post_link = soup.new_tag('a', href=d['url'], target="_blank", rel="noopener noreferrer")
                 post_link.string = "Job Posting"
-                d['url'] = post_link
+                d['url'] = str(post_link)
             # Creating the table
-            index_page = BeautifulSoup(html, "html.parser")
-            data_table = BeautifulSoup(tabulate(ordered_data, headers="keys", tablefmt="html"), "html.parser")
-            index_page.body.append(data_table)
+            data_table = BeautifulSoup(tabulate(ordered_data, headers="keys", tablefmt="unsafehtml"), "html.parser")
             # Saving the table
-            f.write(str(index_page))
+            f.write(str(data_table))
 
     def main(self):
         # If this is the first run then we will need to generate a all_jobs.json file
@@ -627,7 +611,7 @@ class JobScraper:
                     logging.exception("There was an error with getting jobs for '%s'" % search)
                     logging.warning("This is the URL that caused the error %s" % driver.current_url)
                     logging.warning("We are going to sleep for 5 and then retry. We have %d tries left" % (i - 1))
-                    time.sleep(120)
+                    self.sleep(120)
                     i -= 1
             search_stop_time = int(time.time())
             search_time = search_stop_time - search_start_time
@@ -641,7 +625,7 @@ class JobScraper:
             datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + ".json")
         end_scrape = int(time.time())
         driver.close()
-        time.sleep(3)
+        self.sleep(3)
 
         logging.info("Getting content for %d jobs" % len(processed_data))
         start_content = int(time.time())
@@ -666,10 +650,10 @@ class JobScraper:
         # total_desired_words = len(word_weights)
         for job in processed_data:
             keywords = []
-            if job['remote']:
+            # Setting the initial rating of the job posting
+            if job['remote'] and not self.config['remote_only']:
                 rating = 100
-                if not self.config['remote_only']:
-                    keywords.append('REMOTE')
+                keywords.append('REMOTE')
             else:
                 rating = 0
             # If the job is in a place we do not want to work
@@ -684,16 +668,18 @@ class JobScraper:
             if any(l for l in excluded_title_keywords if l.lower() in job['title'].lower()):
                 keywords.append('TITLE')
                 rating = -999
+            if rating < 0:
+                job['keywords'] = ','.join(keywords)
+                job['rating'] = rating
+                bad_jobs.append(job)
             else:
                 for word in list(word_weights.keys()):
                     if word.lower() in str(job['content']).lower():
+                        logging.info("Keyword of %s found for %s" % (word, job['title']))
                         keywords.append(word)
                         rating += word_weights[word]
-            job['keywords'] = ','.join(keywords)
-            job['rating'] = rating
-            if rating < 0:
-                bad_jobs.append(job)
-            else:
+                job['keywords'] = ','.join(keywords)
+                job['rating'] = rating
                 good_jobs.append(job)
         logging.info("Sorting the jobs by their rating")
         good_jobs.sort(key=lambda x: x['rating'], reverse=True)
@@ -701,6 +687,7 @@ class JobScraper:
         logging.info("Adding newly found results to master list")
 
         self.save_json_data(all_jobs + good_jobs + bad_jobs, "all_jobs.json")
+
         logging.info("Formatting job report for output")
         for i in range(1, 5):
             good_jobs.append(blank_job)
@@ -725,6 +712,7 @@ class JobScraper:
             write(
                 "It took us %d seconds to do the scrape, %d seconds to get content, and %d seconds to process the data" %
                 ((end_scrape - start_scrape), (end_content - start_content), processing_time))
+            write("We had to spend %d seconds sleeping to dodge, duck, dip, dive, and dodge LinkedIn bot detection" % self.sleep_total)
             write("%d of the %d scraped jobs are new" % (len(processed_data), total_scrape))
             write("Out of those new jobs, %d were good and %d were undesirable" % (len(good_jobs), len(bad_jobs)))
             write("In total we have scraped %d jobs to date" % (len(all_jobs + good_jobs + bad_jobs)))
@@ -746,7 +734,8 @@ class JobScraper:
 
 def main():
     scraper = JobScraper()
-    scraper.poc_function()
+    scraper.main()
+    # scraper.poc_function()
 
 
 if __name__ == '__main__':

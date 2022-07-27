@@ -22,6 +22,11 @@
         <a href="#">Documentation</a>
     </nav>
     <hr>
+    <p>
+        Scraper Is: {{ scraper_status }}
+        <br>
+        Runtime Is: {{ scraper_runtime }}
+    </p>
     <div class="content">
         {% block content %} {% endblock %}
     </div>
