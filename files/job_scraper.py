@@ -22,13 +22,11 @@ from tabulate import tabulate
 
 def init_logging():
     # Setting up our log files
-    if not os.path.exists("logs"):
-        os.mkdir("logs")
+    if not os.path.exists("scraper_logs"):
+        os.mkdir("flask_logs")
     if not os.path.exists("scrape_backups"):
         os.mkdir("scrape_backups")
-    if not os.path.exists("daily_reports"):
-        os.mkdir("daily_reports")
-    log_filepath = "logs/" + str(int(time.time())) + ".log"
+    log_filepath = "scraper_logs/" + str(int(time.time())) + ".log"
     log_file_handler = logging.handlers.WatchedFileHandler(os.environ.get(
         "LOGFILE", os.path.join(os.getcwd(), log_filepath)
     ))
@@ -37,7 +35,7 @@ def init_logging():
     root = logging.getLogger()
     root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
     root.addHandler(log_file_handler)
-    logging.info("Logging has been setup. Script is starting")
+    logging.info("Logging has been setup for job scraper")
 
 
 def load_yaml_data(filepath) -> dict:
@@ -668,19 +666,20 @@ class JobScraper:
             if any(l for l in excluded_title_keywords if l.lower() in job['title'].lower()):
                 keywords.append('TITLE')
                 rating = -999
+            # Now to look through all the keywords
+            for word in list(word_weights.keys()):
+                if word.lower() in str(job['content']).lower():
+                    logging.info("Keyword of %s found for %s" % (word, job['title']))
+                    keywords.append(word)
+                    rating += word_weights[word]
+            job['keywords'] = ','.join(keywords)
+            job['rating'] = rating
             if rating < 0:
-                job['keywords'] = ','.join(keywords)
-                job['rating'] = rating
                 bad_jobs.append(job)
             else:
-                for word in list(word_weights.keys()):
-                    if word.lower() in str(job['content']).lower():
-                        logging.info("Keyword of %s found for %s" % (word, job['title']))
-                        keywords.append(word)
-                        rating += word_weights[word]
-                job['keywords'] = ','.join(keywords)
-                job['rating'] = rating
                 good_jobs.append(job)
+        # end for
+
         logging.info("Sorting the jobs by their rating")
         good_jobs.sort(key=lambda x: x['rating'], reverse=True)
         bad_jobs.sort(key=lambda x: x['rating'], reverse=True)

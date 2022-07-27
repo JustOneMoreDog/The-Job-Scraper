@@ -1,12 +1,15 @@
 # Project exclude paths
 /venv/
-files/logs/
-files/scrape_backups/
-files/daily_reports/
-files/all_jobs.json
-files/all_jobs.json.old
 files/cache/*
-!files/cache/KEEP
+!files/cache/.keep
 files/customizations_backups/*
-!files/customizations_backups/KEEP
-/files/templates/2022-04-22-20-7/
+!files/customizations_backups/.keep
+files/flask_logs/*
+!files/flask_logs/.keep
+files/scraper_logs/*
+!files/scraper_logs/.keep
+# Ignoring all the stuff added to templates by the job scraper
+/files/templates/*
+!/files/templates/base.html
+!/files/templates/customizations.html
+!/files/templates/index.html

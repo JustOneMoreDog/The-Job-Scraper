@@ -1,28 +1,21 @@
+import logging
+import logging.handlers
 import os
+import psutil
 import subprocess
 import time
-from collections import namedtuple
-from datetime import datetime, timedelta
-
 import yaml
+
 from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
+from collections import namedtuple
+from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from wtforms import SelectField
-
 from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExperienceLevelsForm, ExcludedLocationsForm, \
     ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles, RestoreButton
-
-# put key in file
-# test that the job scrapper is running properly on schedule
-# clean up job scraper so that is not so ugly
-# add in header section on the right side that says is_running
-
-### EXTRAS
-# The ability for the user to check a box next to a job listing that says applied and then when they hit save it adds it to the cache
-# Then we can have a page called "Applied For" that is just an html table of applied for jobs
+from wtforms import SelectField
 
 
 app_config = {
@@ -36,6 +29,22 @@ app.config.from_mapping(app_config)
 cache = Cache(app)
 customizations_path = "/app/customizations.yaml"
 customizations_backup_path = "/app/customizations_backups/"
+
+
+def init_logging():
+    # Setting up our log files
+    if not os.path.exists("flask_logs"):
+        os.mkdir("flask_logs")
+    log_filepath = "flask_logs/" + str(int(time.time())) + ".log"
+    log_file_handler = logging.handlers.WatchedFileHandler(os.environ.get(
+        "LOGFILE", os.path.join(os.getcwd(), log_filepath)
+    ))
+    formatter = logging.Formatter(logging.BASIC_FORMAT)
+    log_file_handler.setFormatter(formatter)
+    root = logging.getLogger()
+    root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
+    root.addHandler(log_file_handler)
+    logging.info("Logging has been setup for flask")
 
 
 def save_customizations(path):
@@ -56,8 +65,13 @@ def get_job_scrapes():
     job_data_list.reverse()
     return job_data_list
 
+
+init_logging()
+logging.info("Starting first time run initialization")
 cache.clear()
+logging.info("Cache cleared")
 load_customizations(customizations_path)
+logging.info("Customizations loaded")
 curr_ts = 0
 restore_points = []
 for file in os.listdir(customizations_backup_path):
@@ -68,9 +82,11 @@ for file in os.listdir(customizations_backup_path):
             curr_ts = ts
 restore_points.reverse()
 cache.set("restore_points", restore_points)
+logging.info("Restore points set")
 job_data_list = get_job_scrapes()
 cache.set("current_job_data_selection", job_data_list[0])
 cache.set("job_data_list", job_data_list)
+logging.info("Previous scrapes loaded")
 
 executors = {
     'default': ThreadPoolExecutor(16),
@@ -80,10 +96,12 @@ schedule = BackgroundScheduler(timezone='America/New_York', executors=executors)
 
 
 def check_scraper():
-    is_running = os.system('ps aux | grep python | grep job_scraper')
-    if is_running == 0:
-        print("Job Scraper is currently running")
-        x = os.listdir("/app/logs/")
+    is_running = [proc.cmdline() for proc in psutil.process_iter()
+                  if '/usr/bin/python3' in proc.cmdline() and '/app/job_scraper.py' in proc.cmdline()
+                  ]
+    if is_running:
+        logging.info("Job Scraper is currently running")
+        x = os.listdir("/app/flask_logs/")
         x.sort()
         runtime = str(timedelta(seconds=(int(time.time()) - int(x[-1].split(".")[0]))))
         return "Running", runtime
@@ -93,11 +111,11 @@ def check_scraper():
 
 @app.route('/', methods=['GET'])
 def index():
-    print("index %s" % cache.get("current_job_data_selection"))
-    print("list %s" % ','.join(list(cache.get("job_data_list"))))
+    logging.info("index %s" % cache.get("current_job_data_selection"))
+    logging.info("list %s" % ','.join(list(cache.get("job_data_list"))))
     new_scrape_list = get_job_scrapes()
     if new_scrape_list != list(cache.get("job_data_list")):
-        print("New scrapes detected")
+        logging.info("New scrapes detected")
         cache.set("job_data_list", new_scrape_list)
 
     class JobDataDropdown(FlaskForm):
@@ -106,15 +124,15 @@ def index():
     job_list = list(cache.get("job_data_list"))
     curr = cache.get("current_job_data_selection")
     new_job_list = False
-    print("curr %s" % curr)
-    print("job_list %s" % job_list[0])
+    logging.info("curr %s" % curr)
+    logging.info("job_list %s" % job_list[0])
     if curr != job_list[0]:
         job_list.remove(curr)
         new_job_list = sorted(set(job_list))
         new_job_list.reverse()
         new_job_list.insert(0, curr)
-        print("inserted")
-        print(new_job_list)
+        logging.info("inserted")
+        logging.info(new_job_list)
         cache.set("job_data_list", new_job_list)
 
     job_dropdown = JobDataDropdown()
@@ -135,9 +153,8 @@ def index():
 
 @app.route('/display_jobs_set', methods=['POST'])
 def displays_jobs_set():
-    print(request.form['dropdown'])
+    logging.info(request.form['dropdown'])
     cache.set("current_job_data_selection", request.form['dropdown'])
-    print("here %s" % cache.get("current_job_data_selection"))
     return redirect(url_for('index'))
 
 
@@ -185,7 +202,7 @@ def results(date):
 
 @app.route('/<date>/<jobposting>')
 def jobpost(date, jobposting):
-    print(date + '/' + jobposting)
+    logging.info(date + '/' + jobposting)
     return render_template(date + '/' + jobposting + '/content.html')
 
 
@@ -303,21 +320,21 @@ def process_customizations(r):
         if k not in curr:
             exit(-1)
         if data[k] != curr[k]:
-            print("failed to match these two")
-            print(data[k])
-            print(curr[k])
+            logging.info("failed to match these two")
+            logging.info(data[k])
+            logging.info(curr[k])
             changed = True
     if changed:
-        print("Customizations changed, saving to file")
+        logging.info("Customizations changed, saving to file")
         name = "customizations-" + str(int(time.time())) + ".yaml"
         ts = datetime.utcfromtimestamp(int(time.time())).strftime('%Y-%m-%d %H:%M:%S')
         rp = list(cache.get("restore_points"))
         rp.insert(0, (name, ts))
         cache.set("restore_points", rp)
-        print("Saving backup")
+        logging.info("Saving backup")
         save_customizations(os.path.join(customizations_backup_path, name))
         cache.set("customizations", data)
-        print("Saving new")
+        logging.info("Saving new")
         save_customizations(customizations_path)
         cache.set("last_updated", ts)
 
@@ -330,43 +347,17 @@ def run_job_scraper():
 
 
 if not schedule.running:
-    print("Starting the background scheduler")
+    logging.info("Starting the background scheduler")
     schedule.start()
-    print("Started")
-    schedule.add_job(run_job_scraper, 'interval', seconds=3600)
-    print("Job added")
+    logging.info("Started")
+    today = datetime.today()
+    first_run = today + timedelta(days=1)
+    first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
+    schedule.add_job(run_job_scraper, 'interval', hours=24, start_date=first_runtime, end_date='2050-01-01 06:00:00')
+    #schedule.add_job(run_job_scraper, 'interval', seconds=3600)
+    logging.info("Job added")
 
 if __name__ == '__main__':
-    # print("Scrapper class been called")
-    # print("Now we are going to start the background scheduler")
-    # print("Now we are going to sleep for 5 seconds to give it a chance to run its first loop")
-    #app.debug = True
     app.run(host="0.0.0.0", port=8080)
 
 # https://blog.jcharistech.com/2019/12/12/how-to-render-markdown-in-flask/
-
-# Known bugs
-# when you click on the content button, it takes you to a url that ends in /content.html and we need to remove that part
-# need a documentation page
-
-'''
-Next steps 
-trim up all the fat 
-build out the rest of the form 
-ps aux grep job scraper if not null it is running 
-to minimize errors, lets get a global variable going that contains the customization data
-    this variable is init-ed when program first runs
-    modified when the user does a post on customizations form 
-    written to disk during that post
-# checking to make sure the file is not open to avoid file locks
-while true:
-    try to open the file; break (or put code in here) except some error continue 
-# 
-when saving a new customizations to disk, a function is run
-    moves current customizations.yaml file to a customizations_history folder 
-    name of file is unix time code
-when user loads customizations form
-    dropdown list is populated with contents of customizations_history folder
-    unix time code stamp translated to standard date / time strings
-    hitting restore does a post to customizations_restore which takes the strings and restores the file accordingly and then redirects back
-'''
