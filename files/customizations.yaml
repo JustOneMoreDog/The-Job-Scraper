@@ -1,0 +1,34 @@
+excluded_companies:
+- ClearanceJobs
+excluded_locations:
+- Chantilly
+excluded_title_keywords:
+- Manager
+experience_levels:
+  Associate: true
+  Director: false
+  Entry level: false
+  Internship: true
+  Mid-Senior level: true
+locations:
+- Washington DC-Baltimore Area
+minimum_jobs_per_search: 50
+searches:
+- Cloud Engineer
+- Cloud Security Engineer
+- Security Engineer
+- Senior Cloud Engineer
+- Senior Cloud Security Engineer
+word_weights:
+  AWS Security: 50
+  AWS Solutions Architect: 50
+  CKA: 25
+  Certified Kubernetes Administrator: 50
+  AWS: 50
+  Azure: -25
+  GCP: -25
+  ansible: 15
+  clearance: -50
+  kubernetes: 10
+  terraform: 15
+  travel: -100
