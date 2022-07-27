@@ -1,4 +1,4 @@
-# Project exclude paths
+# Excluding PyCharm
 /venv/
 files/cache/*
 !files/cache/.keep
