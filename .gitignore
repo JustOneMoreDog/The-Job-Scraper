@@ -10,6 +10,8 @@ files/scraper_logs/*
 !files/scraper_logs/.keep
 # Ignoring all the stuff added to templates by the job scraper
 /files/templates/*
+!/files/templates/Welcome Page/
 !/files/templates/base.html
-!/files/templates/customizations_default.html
+!/files/templates/customizations.html
 !/files/templates/index.html
+/files/customizations.yaml
