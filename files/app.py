@@ -60,9 +60,10 @@ def load_customizations(path):
 def get_job_scrapes():
     job_data_list = list()
     for x in os.listdir('/app/templates'):
-        if os.path.isdir(os.path.join('/app/templates', x)):
+        if os.path.isdir(os.path.join('/app/templates', x)) and x != 'Welcome Page':
             job_data_list.append(x)
-    job_data_list.reverse()
+    job_data_list.sort(reverse=True)
+    job_data_list.append('Welcome Page')
     return job_data_list
 
 
@@ -111,36 +112,37 @@ def check_scraper():
 
 @app.route('/', methods=['GET'])
 def index():
-    logging.info("index %s" % cache.get("current_job_data_selection"))
-    logging.info("list %s" % ','.join(list(cache.get("job_data_list"))))
-    new_scrape_list = get_job_scrapes()
-    if new_scrape_list != list(cache.get("job_data_list")):
-        logging.info("New scrapes detected")
-        cache.set("job_data_list", new_scrape_list)
-
     class JobDataDropdown(FlaskForm):
         dropdown = SelectField()
 
-    job_list = list(cache.get("job_data_list"))
-    curr = cache.get("current_job_data_selection")
+    curr_scrape_selection = str(cache.get("current_job_data_selection"))
+    curr_scrape_list = list(cache.get("job_data_list"))
+    new_scrape_list = get_job_scrapes()
+    logging.info("Current Selection: %s" % curr_scrape_selection)
+    logging.info("Current List: %s" % ','.join(curr_scrape_list))
+    logging.info("New List: %s" % ','.join(new_scrape_list))
+    for scrape in new_scrape_list:
+        if scrape not in curr_scrape_list:
+            logging.info("New scrapes detected")
+            cache.set("job_data_list", new_scrape_list)
+            curr_scrape_list = new_scrape_list
+            break
+
     new_job_list = False
-    logging.info("curr %s" % curr)
-    logging.info("job_list %s" % job_list[0])
-    if curr != job_list[0]:
-        job_list.remove(curr)
-        new_job_list = sorted(set(job_list))
+    if curr_scrape_selection != curr_scrape_list[0]:
+        curr_scrape_list.remove(curr_scrape_selection)
+        curr_scrape_list.remove('Welcome Page')
+        new_job_list = sorted(set(curr_scrape_list))
         new_job_list.reverse()
-        new_job_list.insert(0, curr)
-        logging.info("inserted")
-        logging.info(new_job_list)
+        new_job_list.insert(0, curr_scrape_selection)
+        new_job_list.append('Welcome Page')
+        logging.info("Inserted new selection choice and welcome page option")
+        logging.info("Formatted new list: %s" % ','.join(new_job_list))
         cache.set("job_data_list", new_job_list)
 
     job_dropdown = JobDataDropdown()
-    job_dropdown.dropdown.choices = new_job_list if new_job_list else job_list
+    job_dropdown.dropdown.choices = new_job_list if new_job_list else curr_scrape_list
     table_choice = job_dropdown.dropdown.choices[0] + "/index.html"
-    '''
-    so we can basically just render the actual job
-    '''
     scraper_status, scraper_runtime = check_scraper()
     return render_template(
         'index.html',
@@ -169,8 +171,6 @@ def customizations_get():
     excluded_org_form_data = getFormData('excluded_org_label', 'excluded_companies', customizations)
     excluded_title_data = getFormData('excluded_titles_label', 'excluded_title_keywords', customizations)
     keyword_form_data = getFormData('keyword_label', 'word_weights', customizations)
-
-    # run_time_data = getFormData('run_time_label', 'run_time', customizations)
 
     class RestoreOptionsDropdown(FlaskForm):
         dropdown = SelectField('restores', choices=cache.get("restore_points"))
@@ -350,11 +350,14 @@ if not schedule.running:
     logging.info("Starting the background scheduler")
     schedule.start()
     logging.info("Started")
-    today = datetime.today()
-    first_run = today + timedelta(days=1)
-    first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
-    schedule.add_job(run_job_scraper, 'interval', hours=24, start_date=first_runtime, end_date='2050-01-01 06:00:00')
-    #schedule.add_job(run_job_scraper, 'interval', seconds=3600)
+    # today = datetime.today()
+    # first_run = today + timedelta(days=1)
+    # first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
+    # first_runtime_obj = datetime.strptime(first_runtime, "%y-%m-%d %H:%M:%S")
+    # schedule.add_job(run_job_scraper,
+    #                  'interval', hours=24, start_date=first_runtime_obj, end_date='2050-01-01 06:00:00'
+    #                  )
+    schedule.add_job(run_job_scraper, 'interval', hours=3)
     logging.info("Job added")
 
 if __name__ == '__main__':

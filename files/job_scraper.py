@@ -516,8 +516,7 @@ class JobScraper:
         </body>
         </html>
         """
-        path = os.path.join(path, (str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(
-            datetime.today().time().minute)))
+        path = os.path.join(path, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
         index_path = os.path.join(path, "index.html")
         # If the directory does not exist (it should not) we make it
         if not os.path.exists(path):
@@ -674,7 +673,7 @@ class JobScraper:
                     rating += word_weights[word]
             job['keywords'] = ','.join(keywords)
             job['rating'] = rating
-            if rating < 0:
+            if rating <= 0:
                 bad_jobs.append(job)
             else:
                 good_jobs.append(job)
