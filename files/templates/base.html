@@ -23,10 +23,10 @@
     </nav>
     <hr>
     <p>
-        Scraper Is: {{ scraper_status }}
-        <br>
-        Runtime Is: {{ scraper_runtime }}
-    </p>
+       Scraper   Is: {{ scraper_status['status'] }} <br>
+       Running  For: {{ scraper_status['runtime'] }} <br>
+       Next Run  In: {{ scraper_status['hours'] }} Hours <br>
+    </p><br>
     <div class="content">
         {% block content %} {% endblock %}
     </div>

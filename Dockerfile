@@ -39,3 +39,6 @@ RUN pip3 install -r requirements.txt --no-warn-script-location
 # Starting the Flask App
 CMD [ "/usr/bin/python3", "/app/app.py"]
 
+# check boxes
+# https://www.youtube.com/watch?v=_sgVt16Q4O4
+# also put min jobs per search and experience levels at the bottom

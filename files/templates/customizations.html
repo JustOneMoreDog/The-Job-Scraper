@@ -6,70 +6,58 @@
         Last Updated: {{ last_updated }}
         <br>
         Restore Points: {{ restore_points.dropdown }} <input type="submit" value="Restore">
-{#        Restore Points: {{ restore_points.dropdown }} {{ restore_button.button }}#}
     </p>
     </form>
     <hr>
-    <h4>Search Terms</h4>
     <form method="POST" action="/customizations_set">
+        <h4>Search Terms</h4>
+        {% if customizations_errors['searches'] %}
+            {{ customizations_errors['searches']|safe }}
+        {% endif %}
         {% for nested in searchTerms.rows %}
             {{ nested.search_term_label }}
             <br>
         {% endfor %}
         {{ searchTerms.add_row }}
         <br>
-        <h4>Minimum Jobs Per Search</h4>
-        {% for nested in minEntries.rows %}
-            {{ nested.min_jobs_label }}
-            <br>
-        {% endfor %}
-        <br>
         <h4>Search Locations</h4>
+        {% if customizations_errors['locations'] %}
+            {{ customizations_errors['locations']|safe }}
+        {% endif %}
         {% for nested in locations.rows %}
             {{ nested.location_label }}
             <br>
         {% endfor %}
-        <h4>Experience Levels</h4>
-        <table>
-            <tbody>
-                <tr>
-                    <td>Internship</td>
-                    <td>{{ experiences.rows[0].experience_level_label }}</td>
-                </tr>
-                <tr>
-                    <td>Entry</td>
-                    <td>{{ experiences.rows[1].experience_level_label }}</td>
-                </tr>
-                <tr>
-                    <td>Associate</td>
-                    <td>{{ experiences.rows[2].experience_level_label }}</td>
-                </tr>
-                <tr>
-                    <td>Mid-Senior</td>
-                    <td>{{ experiences.rows[3].experience_level_label }}</td>
-                </tr>
-                <tr>
-                    <td>Director</td>
-                    <td>{{ experiences.rows[4].experience_level_label }}</td>
-                </tr>
-            </tbody>
-        </table>
+        <br>
         <h4>Excluded Locations</h4>
+        {% if customizations_errors['excluded_locations'] %}
+            {{ customizations_errors['excluded_locations']|safe }}
+        {% endif %}
         {% for nested in excluded_locations.rows %}
             {{ nested.exclude_location_label }}
             <br>
         {% endfor %}
+        <br>
         <h4>Excluded Companies</h4>
+        {% if customizations_errors['excluded_companies'] %}
+            {{ customizations_errors['excluded_companies']|safe }}
+        {% endif %}
         {% for nested in excluded_companies.rows %}
             {{ nested.excluded_org_label }}
             <br>
         {% endfor %}
         <h4>Excluded Title Keywords</h4>
+        {% if customizations_errors['excluded_title_keywords'] %}
+            {{ customizations_errors['excluded_title_keywords']|safe }}
+        {% endif %}
         {% for nested in excluded_titles.rows %}
             {{ nested.excluded_titles_label }}
             <br>
         {% endfor %}
         <h4>Keyword Weights</h4>
+        {% if customizations_errors['word_weights'] %}
+            {{ customizations_errors['word_weights']|safe }}
+        {% endif %}
         <table>
             <tbody>
                 {% for nested in keyword_weights.rows %}
@@ -84,14 +72,45 @@
                 {% endfor %}
             </tbody>
         </table>
-{#        <h4>Run Time</h4>#}
-{#        {% for nested in run_time.rows %}#}
-{#            {{ nested.run_time_label }}#}
-{#            <br>#}
-{#        {% endfor %}#}
+        <h4>Experience Levels</h4>
+        {% if customizations_errors['experience_levels'] %}
+            {{ customizations_errors['experience_levels']|safe }}
+        {% endif %}
+        <table>
+            <tbody>
+                <tr>
+                    <td>Internship</td>
+                    <td> {{ experiences['Internship']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Entry</td>
+                    <td> {{ experiences['Entry level']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Associate</td>
+                    <td> {{ experiences['Associate']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Mid-Senior</td>
+                    <td> {{ experiences['Mid-Senior level']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Director</td>
+                    <td> {{ experiences['Director']|safe }} </td>
+                </tr>
+            </tbody>
+        </table>
+        <h4>Minimum Jobs Per Search</h4>
+        {% if customizations_errors['minimum_jobs_per_search'] %}
+            {{ customizations_errors['minimum_jobs_per_search']|safe }}
+        {% endif %}
+        {% for nested in minEntries.rows %}
+            {{ nested.min_jobs_label }}
+            <br>
+        {% endfor %}
+        <br>
     <br>
     <input type="submit" value="Save">
-{#    {{ confirm_button.button }}#}
     </form>
     <br>
 

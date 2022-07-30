@@ -2,6 +2,7 @@ import logging
 import logging.handlers
 import os
 import psutil
+import re
 import subprocess
 import time
 import yaml
@@ -67,7 +68,14 @@ def get_job_scrapes():
     return job_data_list
 
 
-init_logging()
+def clear_input_validation_checks():
+    customization_errors = dict()
+    for k in dict(cache.get("customizations")).keys():
+        customization_errors[k] = False
+    cache.set("customizations_errors", customization_errors)
+
+
+#init_logging()
 logging.info("Starting first time run initialization")
 cache.clear()
 logging.info("Cache cleared")
@@ -88,6 +96,9 @@ job_data_list = get_job_scrapes()
 cache.set("current_job_data_selection", job_data_list[0])
 cache.set("job_data_list", job_data_list)
 logging.info("Previous scrapes loaded")
+# Setting the input validation cache values
+cache.set("customizations_errors", False)
+clear_input_validation_checks()
 
 executors = {
     'default': ThreadPoolExecutor(16),
@@ -100,14 +111,28 @@ def check_scraper():
     is_running = [proc.cmdline() for proc in psutil.process_iter()
                   if '/usr/bin/python3' in proc.cmdline() and '/app/job_scraper.py' in proc.cmdline()
                   ]
+    if datetime.today().hour > 5:
+        hours_until = 24 - datetime.today().hour + 5
+    elif datetime.today().hour < 5:
+        hours_until = (-1 * datetime.today().hour) + 5
+    else:
+        hours_until = 0
     if is_running:
         logging.info("Job Scraper is currently running")
         x = os.listdir("/app/flask_logs/")
         x.sort()
         runtime = str(timedelta(seconds=(int(time.time()) - int(x[-1].split(".")[0]))))
-        return "Running", runtime
+        return {
+            'status': "Running",
+            'runtime': runtime,
+            'hours': hours_until
+        }
     else:
-        return "Stopped", '0:00:00'
+        return {
+            'status': "Stopped",
+            'runtime': "0:00:00",
+            'hours': hours_until
+        }
 
 
 @app.route('/', methods=['GET'])
@@ -131,7 +156,7 @@ def index():
     new_job_list = False
     if curr_scrape_selection != curr_scrape_list[0]:
         curr_scrape_list.remove(curr_scrape_selection)
-        curr_scrape_list.remove('Welcome Page')
+        curr_scrape_list.remove('Welcome Page') if 'Welcome Page' in curr_scrape_list else None
         new_job_list = sorted(set(curr_scrape_list))
         new_job_list.reverse()
         new_job_list.insert(0, curr_scrape_selection)
@@ -143,13 +168,12 @@ def index():
     job_dropdown = JobDataDropdown()
     job_dropdown.dropdown.choices = new_job_list if new_job_list else curr_scrape_list
     table_choice = job_dropdown.dropdown.choices[0] + "/index.html"
-    scraper_status, scraper_runtime = check_scraper()
+    scraper_status = check_scraper()
     return render_template(
         'index.html',
         job_scrapes=job_dropdown,
         job_table_choice=table_choice,
-        scraper_status=scraper_status,
-        scraper_runtime=scraper_runtime
+        scraper_status=scraper_status
     )
 
 
@@ -172,16 +196,23 @@ def customizations_get():
     excluded_title_data = getFormData('excluded_titles_label', 'excluded_title_keywords', customizations)
     keyword_form_data = getFormData('keyword_label', 'word_weights', customizations)
 
+    # Now we check if there are any input validation errors
+    error_check = bool(cache.get("customizations_errors"))
+    customizations_errors = dict(cache.get("customizations_errors"))
+    if error_check:
+        # Since we have everything already pulled out we can reset the errors and pass the dict to jinja
+        clear_input_validation_checks()
+
     class RestoreOptionsDropdown(FlaskForm):
         dropdown = SelectField('restores', choices=cache.get("restore_points"))
 
-    scraper_status, scraper_runtime = check_scraper()
+    scraper_status = check_scraper()
     return render_template(
         'customizations.html',
         searchTerms=SearchTermsForm(data=search_form_data),
         minEntries=MinJobsForm(data=min_jobs_form_data),
         locations=LocationsForm(data=location_form_data),
-        experiences=ExperienceLevelsForm(data=experience_form_data),
+        experiences=experience_form_data,
         excluded_locations=ExcludedLocationsForm(data=excluded_location_form_data),
         excluded_companies=ExcludedCompanies(data=excluded_org_form_data),
         excluded_titles=ExcludedTitles(data=excluded_title_data),
@@ -189,9 +220,8 @@ def customizations_get():
         confirm_button=SubmitButton(),
         last_updated=cache.get("last_updated"),
         restore_points=RestoreOptionsDropdown(),
-        restore_button=RestoreButton(),
         scraper_status=scraper_status,
-        scraper_runtime=scraper_runtime
+        customizations_errors=customizations_errors
     )
 
 
@@ -212,16 +242,13 @@ def getFormData(html_label, yaml_label, customizations):
     if html_label == "min_jobs_label":
         data['rows'].append(search_term(str(customizations[yaml_label])))
         return data
-    # if html_label == "run_time_label":
-    #     data['rows'].append(search_term(str(customizations[yaml_label])))
-    #     return data
     if html_label == "experience_level_label":
-        # This will require a little hands on to ensure order
-        data['rows'].append(search_term(str(customizations[yaml_label]['Internship'])))
-        data['rows'].append(search_term(str(customizations[yaml_label]['Entry level'])))
-        data['rows'].append(search_term(str(customizations[yaml_label]['Associate'])))
-        data['rows'].append(search_term(str(customizations[yaml_label]['Mid-Senior level'])))
-        data['rows'].append(search_term(str(customizations[yaml_label]['Director'])))
+        data = {}
+        for k, v in customizations[yaml_label].items():
+            if v:
+                data[k] = "<input type='checkbox' value=\"" + k + "\" name='explvl' checked>"
+            else:
+                data[k] = "<input type='checkbox' value=\"" + k + "\" name='explvl'>"
         return data
     if html_label == "keyword_label":
         # Need to manually translate the data here
@@ -280,40 +307,80 @@ def process_customizations(r):
         if not v or not k:
             continue
         elif 'search_term' in k:
-            data['searches'].append(v)
+            data['searches'].append(str(v).strip())
         elif 'min_jobs' in k:
-            data['minimum_jobs_per_search'] = int(v)
+            data['minimum_jobs_per_search'] = str(v)
         elif '-location' in k:
-            data['locations'].append(v)
-        elif 'experience_level' in k:
-            if v.lower() == 'true':
-                x = True
-            else:
-                x = False
-            if '0' in k:
-                data['experience_levels']['Internship'] = x
-            elif '1' in k:
-                data['experience_levels']['Entry level'] = x
-            elif '2' in k:
-                data['experience_levels']['Associate'] = x
-            elif '3' in k:
-                data['experience_levels']['Mid-Senior level'] = x
-            else:
-                data['experience_levels']['Director'] = x
+            data['locations'].append(str(v).strip())
         elif 'exclude_location' in k:
-            data['excluded_locations'].append(v)
+            data['excluded_locations'].append(str(v).strip())
         elif 'excluded_org' in k:
-            data['excluded_companies'].append(v)
+            data['excluded_companies'].append(str(v).strip())
         elif 'excluded_titles' in k:
-            data['excluded_title_keywords'].append(v)
-        # TO-DO figure out why 5:00 turns into 300 ?????
-        # elif 'run_time' in k:
-        #     data['run_time'] = "\"" + str(v) + "\""
+            data['excluded_title_keywords'].append(str(v).strip())
         elif 'keyword' in k or 'weight' in k:
             if int(str(k).split("-")[1]) % 2 == 0:
-                curr_kw = v
+                curr_kw = str(v).strip()
                 continue
-            data['word_weights'][curr_kw] = int(v)
+            data['word_weights'][curr_kw] = str(v).strip()
+    for exp in ['Internship', 'Entry level', 'Associate', 'Mid-Senior level', 'Director']:
+        data['experience_levels'][exp] = True if exp in r.form.getlist('explvl') else False
+    # Now we verify if the data is valid
+    invalid_data = False
+    pattern = re.compile(r'^[\sa-zA-Z0-9-,]+$')
+    customizations_errors = dict(cache.get("customizations_errors"))
+    for k, v in data.items():
+        message = ""
+        needs_error_element = False
+        if not v:
+            invalid_data = True
+            needs_error_element = True
+            message = "You must specify at least one value"
+        elif type(v) == list:
+            for entry in v:
+                if not re.search(pattern, entry):
+                    invalid_data = True
+                    needs_error_element = True
+                    message = "Entries must only contain letters, numbers, dashes, and commas"
+                    break
+        elif k == 'word_weights':
+            for l, w in v.items():
+                if not re.search(pattern, l):
+                    invalid_data = True
+                    needs_error_element = True
+                    message = "Entries must only contain letters, numbers, dashes, and commas"
+                    break
+                if (w[0] == "-" and w[1:].isnumeric()) or (w[0] != "-" and w.isnumeric()):
+                    # Once we have confirmed that it is either a positive or negative number we make it an int
+                    data[k][l] = int(w)
+                else:
+                    invalid_data = True
+                    needs_error_element = True
+                    message = "Weights must be either a positive or negative number"
+                    break
+        elif k == 'minimum_jobs_per_search':
+            if v.isnumeric() and int(v) > 0:
+                data[k] = int(v)
+            else:
+                invalid_data = True
+                needs_error_element = True
+                message = "This must be a positive number greater than 0"
+        elif k == 'experience_levels':
+            # If none of the checkboxes are checked then all the values will be false
+            if all(not x for x in v.values()):
+                invalid_data = True
+                needs_error_element = True
+                message = "At least one experience level must be checked"
+        if needs_error_element:
+            logging.error("%s has incorrect values" % k)
+            html_error_element = "<p style=\"color:red;\"><b>" + message + "</b></p><br>"
+            customizations_errors[k] = html_error_element
+            continue
+    # end validation check for loop
+    if invalid_data:
+        cache.set("customizations_errors", invalid_data)
+        cache.set("customizations_errors", customizations_errors)
+        return
     # Checking if the data has been changed at all
     changed = False
     for k, v in data.items():
@@ -340,16 +407,13 @@ def process_customizations(r):
 
 
 def run_job_scraper():
-    os.environ["SCRAPERRUNNING"] = "True"
-    subprocess.run(['/usr/bin/python3',
-                    '/app/job_scraper.py'
-                    ])
+    subprocess.run(['/usr/bin/python3', '/app/job_scraper.py'])
 
 
 if not schedule.running:
     logging.info("Starting the background scheduler")
-    schedule.start()
-    logging.info("Started")
+    # schedule.start()
+    # logging.info("Started")
     # today = datetime.today()
     # first_run = today + timedelta(days=1)
     # first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
@@ -357,8 +421,9 @@ if not schedule.running:
     # schedule.add_job(run_job_scraper,
     #                  'interval', hours=24, start_date=first_runtime_obj, end_date='2050-01-01 06:00:00'
     #                  )
-    schedule.add_job(run_job_scraper, 'interval', hours=3)
-    logging.info("Job added")
+    # schedule.add_job(run_job_scraper, 'interval', hours=3)
+    # logging.info("Job added")
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080)
