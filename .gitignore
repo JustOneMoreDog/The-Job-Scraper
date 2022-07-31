@@ -15,3 +15,5 @@ files/scraper_logs/*
 !/files/templates/customizations.html
 !/files/templates/index.html
 /files/customizations.yaml
+/files/all_jobs.json
+/files/all_jobs.json.old
