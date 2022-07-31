@@ -22,11 +22,13 @@ from tabulate import tabulate
 
 def init_logging():
     # Setting up our log files
-    if not os.path.exists("scraper_logs"):
-        os.mkdir("flask_logs")
+    if not os.path.exists("logs"):
+        os.mkdir("logs")
     if not os.path.exists("scrape_backups"):
         os.mkdir("scrape_backups")
-    log_filepath = "scraper_logs/" + str(int(time.time())) + ".log"
+    if not os.path.exists("daily_reports"):
+        os.mkdir("daily_reports")
+    log_filepath = "logs/" + str(int(time.time())) + ".log"
     log_file_handler = logging.handlers.WatchedFileHandler(os.environ.get(
         "LOGFILE", os.path.join(os.getcwd(), log_filepath)
     ))
@@ -35,7 +37,7 @@ def init_logging():
     root = logging.getLogger()
     root.setLevel(os.environ.get("LOGLEVEL", "INFO"))
     root.addHandler(log_file_handler)
-    logging.info("Logging has been setup for job scraper")
+    logging.info("Logging has been setup. Script is starting")
 
 
 def load_yaml_data(filepath) -> dict:
@@ -144,7 +146,7 @@ class JobScraper:
             backoff += 1
             # Both of these need to not have happened in order for the page to be considered valid
             if self.check_for_redirect(driver, checks, backoff) and \
-                    not self.check_for_429(driver, backoff):
+                    self.check_for_429(driver, backoff):
                 break
 
     # Utility function for validate_page
@@ -190,8 +192,6 @@ class JobScraper:
                 driver.refresh()
                 driver.wait_for_page_load()
                 self.sleep(1)
-            if backoff >= 30:
-                raise Exception("We have been 429-ed by LinkedIn so many times that we need to full stop")
         return hit_with_the_429
 
     def get_job_posts(self, location, timespan_button, driver, known_tags,
@@ -516,7 +516,8 @@ class JobScraper:
         </body>
         </html>
         """
-        path = os.path.join(path, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
+        path = os.path.join(path, (str(datetime.today().date()) + "-" + str(datetime.today().time().hour) + "-" + str(
+            datetime.today().time().minute)))
         index_path = os.path.join(path, "index.html")
         # If the directory does not exist (it should not) we make it
         if not os.path.exists(path):
@@ -634,7 +635,7 @@ class JobScraper:
         options.add_experimental_option('excludeSwitches', ['enable-automation'])
         driver = Chrome(options=options)
         SharedDriver.set_instance(driver)
-        for job in processed_data:
+        for job in processed_data[:25]:
             logging.info("Parsing %s" % job['url'])
             job['content'] = self.get_job_content(job['url'], driver, SharedDriver())
         end_content = int(time.time())
@@ -645,7 +646,7 @@ class JobScraper:
         good_jobs = []
         bad_jobs = []
         # total_desired_words = len(word_weights)
-        for job in processed_data:
+        for job in processed_data[:25]:
             keywords = []
             # Setting the initial rating of the job posting
             if job['remote'] and not self.config['remote_only']:
@@ -665,20 +666,19 @@ class JobScraper:
             if any(l for l in excluded_title_keywords if l.lower() in job['title'].lower()):
                 keywords.append('TITLE')
                 rating = -999
-            # Now to look through all the keywords
-            for word in list(word_weights.keys()):
-                if word.lower() in str(job['content']).lower():
-                    logging.info("Keyword of %s found for %s" % (word, job['title']))
-                    keywords.append(word)
-                    rating += word_weights[word]
-            job['keywords'] = ','.join(keywords)
-            job['rating'] = rating
-            if rating <= 0:
+            if rating < 0:
+                job['keywords'] = ','.join(keywords)
+                job['rating'] = rating
                 bad_jobs.append(job)
             else:
+                for word in list(word_weights.keys()):
+                    if word.lower() in str(job['content']).lower():
+                        logging.info("Keyword of %s found for %s" % (word, job['title']))
+                        keywords.append(word)
+                        rating += word_weights[word]
+                job['keywords'] = ','.join(keywords)
+                job['rating'] = rating
                 good_jobs.append(job)
-        # end for
-
         logging.info("Sorting the jobs by their rating")
         good_jobs.sort(key=lambda x: x['rating'], reverse=True)
         bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
@@ -738,3 +738,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# test 

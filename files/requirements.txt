@@ -1,11 +1,10 @@
 APScheduler==3.9.1
+beautifulsoup4==4.11.1
+Flask==2.1.2
 Flask-Caching==2.0.0
 Flask-WTF==1.0.1
-Flask==2.1.2
+hed-utils==5.0.0
 PyYAML==6.0
 WTForms==3.0.1
-beautifulsoup4==4.11.1
-hed-utils==5.0.0
-psutil==5.9.1
 selenium==3.141.0
 tabulate==0.8.10

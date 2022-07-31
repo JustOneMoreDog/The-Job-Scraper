@@ -3,6 +3,10 @@ body {
     color: #DDD;
 }
 
+.status-table {
+    width: 25%;
+}
+
 table {
     width: 100%;
     border: 1px solid white;
