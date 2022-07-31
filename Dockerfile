@@ -25,7 +25,7 @@ RUN git clone -b flask https://github.com/picnicsecurity/LinkedIn-Job-Scraper.gi
     cp LinkedIn-Job-Scraper/files/customizations_default.yaml LinkedIn-Job-Scraper/files/customizations.yaml
 USER root
 RUN ln -s /home/hunter/LinkedIn-Job-Scraper/files /app && \
-    chown -R hunter:hunter /app \
+    chown -R hunter:hunter /app
 USER hunter
 WORKDIR /app
 RUN pip3 install -r requirements.txt --no-warn-script-location
