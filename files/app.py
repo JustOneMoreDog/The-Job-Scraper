@@ -225,15 +225,10 @@ def customizations_get():
     )
 
 
-@app.route('/<date>')
-def results(date):
-    return render_template(str(date + '/index.html'))
-
-
-@app.route('/<date>/<jobposting>')
-def jobpost(date, jobposting):
-    logging.info(date + '/' + jobposting)
-    return render_template(date + '/' + jobposting + '/content.html')
+@app.route('/<date>/<job_posting>')
+def job_posting_content(date, job_posting):
+    logging.info("User is looking at the content for %s" % (date + '/' + job_posting))
+    return render_template(date + '/' + job_posting + '/content.html')
 
 
 def getFormData(html_label, yaml_label, customizations):

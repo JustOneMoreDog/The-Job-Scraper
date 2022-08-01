@@ -533,14 +533,15 @@ class JobScraper:
                     # create a folder for a job posting that overwrites another job posting
                     content_folder = d['url'].split("/")[-1]
                     os.mkdir(os.path.join(path, content_folder))
-                    content_path = os.path.join(content_folder, "content.html")
+                    content_html_path = os.path.join(content_folder, "content.html")
                     soup = BeautifulSoup(html, "html.parser")
                     soup.body.append(d['content'])
                     # Writing the content to its own file
-                    with open(os.path.join(path, content_path), "w", encoding='utf-8') as g:
+                    with open(os.path.join(path, content_html_path), "w", encoding='utf-8') as g:
                         g.write(soup.prettify())
                     # _blank makes it so that it opens up in a new tab
-                    a_tag = soup.new_tag('a', href=content_path, target="_blank", rel="noopener noreferrer")
+                    content_flask_path = os.path.join(path, content_folder)
+                    a_tag = soup.new_tag('a', href=content_flask_path, target="_blank", rel="noopener noreferrer")
                     a_tag.string = "Content"
                     d['content'] = str(a_tag)
                 post_link = soup.new_tag('a', href=d['url'], target="_blank", rel="noopener noreferrer")
@@ -668,7 +669,6 @@ class JobScraper:
             # Now to look through all the keywords
             for word in list(word_weights.keys()):
                 if word.lower() in str(job['content']).lower():
-                    logging.info("Keyword of %s found for %s" % (word, job['title']))
                     keywords.append(word)
                     rating += word_weights[word]
             job['keywords'] = ','.join(keywords)
