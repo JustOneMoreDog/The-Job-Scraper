@@ -744,7 +744,7 @@ class JobScraper:
 
 def main():
     scraper = JobScraper()
-    #scraper.main()
+    scraper.main()
 
 
 if __name__ == '__main__':
