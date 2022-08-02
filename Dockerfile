@@ -6,8 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN echo "The timezone is ${TIMEZONE}"
 ENV TZ="${TIMEZONE}"
 RUN apt-get update -y && apt-get upgrade -y
-RUN apt-get install -y tzdata
-RUN apt-get install -y python3 wget unzip python3-pip git
+RUN apt-get install -y python3 wget unzip python3-pip git tzdata
 # Installing Google Chrome
 RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt install -y ./google-chrome-stable_current_amd64.deb && \
