@@ -659,7 +659,7 @@ class JobScraper:
                 logging.info("Parsing %s" % job['url'])
                 job['content'], job['industry'] = self.get_job_content(job['url'], driver, SharedDriver())
             else:
-                logging.info("%s is being skipped due to being in an exclude list" % job['url'])
+                logging.info("%s is being skipped due to being in the %s exclude list" % (job['url'], job['keywords']))
                 job['keywords'] = ','.join(keywords)
                 job['content'] = """"
                 <html>
@@ -683,10 +683,10 @@ class JobScraper:
         for job in processed_data:
             keywords = []
             if any(l for l in excluded_industries if l.lower() in job['industry'].lower()):
-                keywords.append("INDUSTRY")
+                job['keywords'] = "INDUSTRY"
                 job['rating'] = rating = -999
             if job['rating'] != 0:
-                logging.info("%s is being skipped due to being in an exclude list" % job['url'])
+                logging.info("%s is being skipped due to being in the %s exclude list" % (job['url'], job['keywords']))
                 bad_jobs.append(job)
                 continue
             # Setting the initial rating of the job posting
@@ -719,7 +719,7 @@ class JobScraper:
         for i in range(1, 5):
             good_jobs.append(blank_job)
         good_jobs.append({"posted_time": "Excluded Jobs", "location": "", "title": "", "company": "",
-                          "rating": "", "keywords": "Note: LOCation, COMPany, TITLE",
+                          "industry": "", "rating": "", "keywords": "Note: LOCation, COMPany, TITLE",
                           "search": "", "url": "", "content": ""})
         if html_path:
             logging.info("Saving job report to html file")
