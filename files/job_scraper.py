@@ -73,8 +73,10 @@ class JobScraper:
         str(int(time.time())), ','.join(self.config['searches'])))
         logging.info(self.config)
 
-    def parse(self, tag, search, remote) -> Dict[str, Any]:
-        job = {key: None for key in ["posted_time", "location", "title", "company", "url", "search", "remote"]}
+    def parse(self, tag, search, remote):
+        job = {key: None for key in [
+            "posted_time", "location", "title", "company", "url", "search", "remote", "industry"
+        ]}
         job["search"] = search
         job["remote"] = remote
         x = tag.find('time')
@@ -109,14 +111,8 @@ class JobScraper:
             backoff += 1
             if retries == 0:
                 logging.warning("(429) Ran out of retries and could not get the job content for %s" % url)
-                return BeautifulSoup()
-        retries = self.config['max_retries']
-        # while True:
-        #     if retries != self.config['max_retries'] and driver.current_url != url:
-        #         driver.get(url)
-        #         shared_driver.wait_for_page_load()
-        #         self.sleep(1)
-        #         self.validate_page(shared_driver)
+                return BeautifulSoup(), "Unknown"
+        job_industry = "Unknown"
         elements = driver.find_elements(By.XPATH, self.config['job_description_show_more'])
         if len(elements) > 0:
             for element in elements:
@@ -129,10 +125,14 @@ class JobScraper:
                 self.config['job_description_tag'],
                 class_=self.config['job_description_class']
             )
-            return BeautifulSoup(str(job_description), 'html.parser')
+            # Now we grab the industry
+            for li in soup.find(class_=self.config['criteria_list']).findAll('li'):
+                if li.find(class_=self.config['criteria_list_subheader']).getText().strip().lower() == 'industries':
+                    job_industry = li.find("span").getText().strip()
+            return BeautifulSoup(str(job_description), 'html.parser'), job_industry
         else:
             logging.warning("(No Elements Found) Could not get the job content for %s" % url)
-            return BeautifulSoup()
+            return BeautifulSoup(), job_industry
 
     # This will check if we are getting dickled and LinkedIn redirected us to a login page
     def validate_page(self, driver):
@@ -501,7 +501,9 @@ class JobScraper:
                 return o.__dict__
 
     def save_job_report_html(self, data, path):
-        keys = ["posted_time", "title", "company", "location", "rating", "keywords", "search", "url", "content"]
+        keys = [
+            "posted_time", "title", "company", "industry", "location", "rating", "keywords", "search", "url", "content"
+        ]
         # index_path = os.path.join(path, "index.html")
         # # Our extremely basic HTML page
         html = """
@@ -653,7 +655,7 @@ class JobScraper:
             job['rating'] = rating
             if rating == 0:
                 logging.info("Parsing %s" % job['url'])
-                job['content'] = self.get_job_content(job['url'], driver, SharedDriver())
+                job['content'], job['industry'] = self.get_job_content(job['url'], driver, SharedDriver())
             else:
                 logging.info("%s is being skipped due to being in an exclude list" % job['url'])
                 job['keywords'] = ','.join(keywords)
@@ -738,7 +740,7 @@ class JobScraper:
 
 def main():
     scraper = JobScraper()
-    scraper.main()
+    #scraper.main()
 
 
 if __name__ == '__main__':

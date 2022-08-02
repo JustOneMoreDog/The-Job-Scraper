@@ -68,8 +68,8 @@ class RestoreButton(FlaskForm):
     button = SubmitField(label='Restore')
 
 
-# Minimum Jobs Per Search
-class RunTimeForm(FlaskForm):
-    class RunTimeRow(FlaskForm):
-        run_time_label = StringField(render_kw={'style': 'width: 10ch'})
-    rows = FieldList(FormField(RunTimeRow), min_entries=1, max_entries=1)
+# Excluded Companies Forms
+class ExcludedIndustries(FlaskForm):
+    class IndustryRow(FlaskForm):
+        excluded_industries_label = StringField(render_kw={'style': 'width: 40ch'})
+    rows = FieldList(FormField(IndustryRow), min_entries=1)

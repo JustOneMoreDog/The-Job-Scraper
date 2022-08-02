@@ -22,3 +22,5 @@ word_weights:
   kubernetes: 10
   terraform: 15
   travel: -100
+excluded_industries:
+- Staffing and Recruiting

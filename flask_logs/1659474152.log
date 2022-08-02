@@ -1,0 +1,3 @@
+INFO:root:Logging has been setup for flask
+INFO:root:Starting first time run initialization
+INFO:root:Cache cleared

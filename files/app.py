@@ -14,8 +14,8 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, request
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExperienceLevelsForm, ExcludedLocationsForm, \
-    ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles, RestoreButton
+from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExcludedIndustries, ExcludedLocationsForm, \
+    ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles
 from wtforms import SelectField
 
 
@@ -192,6 +192,7 @@ def customizations_get():
     excluded_location_form_data = getFormData('exclude_location_label', 'excluded_locations', customizations)
     excluded_org_form_data = getFormData('excluded_org_label', 'excluded_companies', customizations)
     excluded_title_data = getFormData('excluded_titles_label', 'excluded_title_keywords', customizations)
+    excluded_industries_data = getFormData('excluded_industries_label', 'excluded_industries', customizations)
     keyword_form_data = getFormData('keyword_label', 'word_weights', customizations)
 
     # Now we check if there are any input validation errors
@@ -218,6 +219,7 @@ def customizations_get():
         confirm_button=SubmitButton(),
         last_updated=cache.get("last_updated"),
         restore_points=RestoreOptionsDropdown(),
+        excluded_industries=ExcludedIndustries(data=excluded_industries_data),
         scraper_status=scraper_status,
         customizations_errors=customizations_errors
     )
@@ -309,6 +311,8 @@ def process_customizations(r):
             data['excluded_locations'].append(str(v).strip())
         elif 'excluded_org' in k:
             data['excluded_companies'].append(str(v).strip())
+        elif 'excluded_industries' in k:
+            data['excluded_industries'].append(str(v).strip())
         elif 'excluded_titles' in k:
             data['excluded_title_keywords'].append(str(v).strip())
         elif 'keyword' in k or 'weight' in k:
@@ -423,3 +427,5 @@ if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080)
 
 # https://blog.jcharistech.com/2019/12/12/how-to-render-markdown-in-flask/
+# https://www.linkedin.com/jobs/view/security-engineer-ii-at-amazon-3024145334/
+# it picked up CKA but it was just package so maybe I need to split the content string by whitespace and then loop through that

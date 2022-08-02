@@ -54,6 +54,14 @@
             {{ nested.excluded_titles_label }}
             <br>
         {% endfor %}
+        <h4>Excluded Industries</h4>
+        {% if customizations_errors['excluded_industries'] %}
+            {{ customizations_errors['excluded_industries']|safe }}
+        {% endif %}
+        {% for nested in excluded_industries.rows %}
+            {{ nested.excluded_industries_label }}
+            <br>
+        {% endfor %}
         <h4>Keyword Weights</h4>
         {% if customizations_errors['word_weights'] %}
             {{ customizations_errors['word_weights']|safe }}
