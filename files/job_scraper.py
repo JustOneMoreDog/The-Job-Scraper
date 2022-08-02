@@ -575,6 +575,7 @@ class JobScraper:
         excluded_locations = self.config['excluded_locations']
         excluded_companies = self.config['excluded_companies']
         excluded_title_keywords = self.config['excluded_title_keywords']
+        excluded_industries = self.config['excluded_industries']
         word_weights = self.config['word_weights']
 
         # We are statically defining that the chrome window be 1920x1080 so that we can have consistency
@@ -679,11 +680,14 @@ class JobScraper:
         bad_jobs = []
         # total_desired_words = len(word_weights)
         for job in processed_data:
+            keywords = []
+            if any(l for l in excluded_industries if l.lower() in job['industry'].lower()):
+                keywords.append("INDUSTRY")
+                job['rating'] = rating = -999
             if job['rating'] != 0:
                 logging.info("%s is being skipped due to being in an exclude list" % job['url'])
                 bad_jobs.append(job)
                 continue
-            keywords = []
             # Setting the initial rating of the job posting
             if job['remote'] and not self.config['remote_only']:
                 rating = 100
