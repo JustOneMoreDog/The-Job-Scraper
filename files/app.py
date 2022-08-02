@@ -295,6 +295,7 @@ def process_customizations(r):
         'excluded_locations': [],
         'excluded_companies': [],
         'excluded_title_keywords': [],
+        'excluded_industries': [],
         'word_weights': {}
     }
     curr_kw = ''
