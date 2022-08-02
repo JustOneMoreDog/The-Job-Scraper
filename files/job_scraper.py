@@ -619,11 +619,10 @@ class JobScraper:
         processed_data, scrape_dups, previously_found, scrape_duds = self.post_job_scrape_processing(data, all_jobs)
         processing_time += int(time.time()) - p_time
         logging.info("Backing up the scrape")
-        self.save_json_data(processed_data, "scrape_backups/" + str(datetime.today().date()) + "-" + str(
-            datetime.today().time().hour) + "-" + str(datetime.today().time().minute) + ".json")
+        self.save_json_data(processed_data, "scrape_backups/" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + ".json")
         end_scrape = int(time.time())
         driver.close()
-        self.sleep(3)
+        self.sleep(5)
 
         logging.info("Getting content for %d jobs" % len(processed_data))
         start_content = int(time.time())
@@ -635,25 +634,10 @@ class JobScraper:
         options.add_experimental_option('excludeSwitches', ['enable-automation'])
         driver = Chrome(options=options)
         SharedDriver.set_instance(driver)
+        # To help speed things up, we are going to not get the content for jobs that are in the exclude list
         for job in processed_data:
-            logging.info("Parsing %s" % job['url'])
-            job['content'] = self.get_job_content(job['url'], driver, SharedDriver())
-        end_content = int(time.time())
-        p_time = int(time.time())
-        logging.info("Organizing results")
-        blank_job = {"posted_time": "", "location": "", "title": "", "company": "",
-                     "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
-        good_jobs = []
-        bad_jobs = []
-        # total_desired_words = len(word_weights)
-        for job in processed_data:
+            rating = 0
             keywords = []
-            # Setting the initial rating of the job posting
-            if job['remote'] and not self.config['remote_only']:
-                rating = 100
-                keywords.append('REMOTE')
-            else:
-                rating = 0
             # If the job is in a place we do not want to work
             # Or if the job is for a company we do not want to work for
             # Or if the job had an excluded keyword in the title
@@ -666,6 +650,44 @@ class JobScraper:
             if any(l for l in excluded_title_keywords if l.lower() in job['title'].lower()):
                 keywords.append('TITLE')
                 rating = -999
+            job['rating'] = rating
+            if rating == 0:
+                logging.info("Parsing %s" % job['url'])
+                job['content'] = self.get_job_content(job['url'], driver, SharedDriver())
+            else:
+                logging.info("%s is being skipped due to being in an exclude list" % job['url'])
+                job['keywords'] = ','.join(keywords)
+                job['content'] = """"
+                <html>
+                <body>
+                <p>
+                Job content not collected due to it having matched an exclusion criteria. <br> 
+                You will need to click on the Job Posting link and go to LinkedIn to see the job posting.
+                </p>
+                </body>
+                </html>
+                """
+        # end for
+        end_content = int(time.time())
+        p_time = int(time.time())
+        logging.info("Organizing results")
+        blank_job = {"posted_time": "", "location": "", "title": "", "company": "",
+                     "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
+        good_jobs = []
+        bad_jobs = []
+        # total_desired_words = len(word_weights)
+        for job in processed_data:
+            if job['rating'] != 0:
+                logging.info("%s is being skipped due to being in an exclude list" % job['url'])
+                bad_jobs.append(job)
+                continue
+            keywords = []
+            # Setting the initial rating of the job posting
+            if job['remote'] and not self.config['remote_only']:
+                rating = 100
+                keywords.append('REMOTE')
+            else:
+                rating = 0
             # Now to look through all the keywords
             for word in list(word_weights.keys()):
                 if word.lower() in str(job['content']).lower():
@@ -697,35 +719,19 @@ class JobScraper:
             self.save_job_report_html((good_jobs + bad_jobs), html_path)
         processing_time += int(time.time()) - p_time
 
-        # Doing this as an inner function to keep it simple
-        def post_script_report(write, data, end_scrape, start_scrape, end_content,
-                               start_content, processing_time, processed_data,
-                               scrape_dups, previously_found, scrape_duds):
-            write("We previously had %d jobs found" % len(all_jobs))
-            total_scrape = reduce(lambda count, l: count + len(l), data, 0)
-            write("Today we scraped %d jobs from LinkedIn" % total_scrape)
-            write("%d of those were duplicates" % scrape_dups)
-            write("%d of those had already been previously found" % previously_found)
-            write("%d of those were duds" % scrape_duds)
-            write(
-                "It took us %d seconds to do the scrape, %d seconds to get content, and %d seconds to process the data" %
-                ((end_scrape - start_scrape), (end_content - start_content), processing_time))
-            write("We had to spend %d seconds sleeping to dodge, duck, dip, dive, and dodge LinkedIn bot detection" % self.sleep_total)
-            write("%d of the %d scraped jobs are new" % (len(processed_data), total_scrape))
-            write("Out of those new jobs, %d were good and %d were undesirable" % (len(good_jobs), len(bad_jobs)))
-            write("In total we have scraped %d jobs to date" % (len(all_jobs + good_jobs + bad_jobs)))
-
-        if self.config['post_script_console_report']:
-            post_script_report(print, data, end_scrape, start_scrape, end_content,
-                               start_content, processing_time, processed_data,
-                               scrape_dups, previously_found, scrape_duds)
-            post_script_report(logging.info, data, end_scrape, start_scrape, end_content,
-                               start_content, processing_time, processed_data,
-                               scrape_dups, previously_found, scrape_duds)
-        else:
-            post_script_report(logging.info, data, end_scrape, start_scrape, end_content,
-                               start_content, processing_time, processed_data,
-                               scrape_dups, previously_found, scrape_duds)
+        logging.info("We previously had %d jobs found" % len(all_jobs))
+        total_scrape = reduce(lambda count, l: count + len(l), data, 0)
+        logging.info("Today we scraped %d jobs from LinkedIn" % total_scrape)
+        logging.info("%d of those were duplicates" % scrape_dups)
+        logging.info("%d of those had already been previously found" % previously_found)
+        logging.info("%d of those were duds" % scrape_duds)
+        logging.info(
+            "It took us %d seconds to do the scrape, %d seconds to get content, and %d seconds to process the data" %
+            ((end_scrape - start_scrape), (end_content - start_content), processing_time))
+        logging.info("We had to spend %d seconds sleeping to dodge, duck, dip, dive, and dodge LinkedIn bot detection" % self.sleep_total)
+        logging.info("%d of the %d scraped jobs are new" % (len(processed_data), total_scrape))
+        logging.info("Out of those new jobs, %d were good and %d were undesirable" % (len(good_jobs), len(bad_jobs)))
+        logging.info("In total we have scraped %d jobs to date" % (len(all_jobs + good_jobs + bad_jobs)))
         logging.info("Daily job scrape complete!")
         driver.close()
 
@@ -733,7 +739,6 @@ class JobScraper:
 def main():
     scraper = JobScraper()
     scraper.main()
-    # scraper.poc_function()
 
 
 if __name__ == '__main__':

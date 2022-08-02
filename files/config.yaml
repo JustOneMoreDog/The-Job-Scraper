@@ -3,7 +3,6 @@ headless: true
 timeout: 10
 max_retries: 3
 scrape_all_last_day_jobs: true
-post_script_console_report: true
 include_remote: true
 remote_only: true
 save_to_html: true

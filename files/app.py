@@ -75,7 +75,7 @@ def clear_input_validation_checks():
     cache.set("customizations_errors", customization_errors)
 
 
-#init_logging()
+init_logging()
 logging.info("Starting first time run initialization")
 cache.clear()
 logging.info("Cache cleared")
@@ -161,8 +161,6 @@ def index():
         new_job_list.reverse()
         new_job_list.insert(0, curr_scrape_selection)
         new_job_list.append('Welcome Page')
-        logging.info("Inserted new selection choice and welcome page option")
-        logging.info("Formatted new list: %s" % ','.join(new_job_list))
         cache.set("job_data_list", new_job_list)
 
     job_dropdown = JobDataDropdown()
@@ -372,6 +370,10 @@ def process_customizations(r):
             customizations_errors[k] = html_error_element
             continue
     # end validation check for loop
+    # TO-DO:
+    # Instead of clearing everything the user did because they did not do one field correctly
+    # lets just make it appear as if it saved when it did not
+    # put a message at the top saying something like, "changes have not been saved. See below for errors"
     if invalid_data:
         cache.set("customizations_errors", invalid_data)
         cache.set("customizations_errors", customizations_errors)
@@ -407,17 +409,14 @@ def run_job_scraper():
 
 if not schedule.running:
     logging.info("Starting the background scheduler")
-    # schedule.start()
-    # logging.info("Started")
-    # today = datetime.today()
-    # first_run = today + timedelta(days=1)
-    # first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
-    # first_runtime_obj = datetime.strptime(first_runtime, "%y-%m-%d %H:%M:%S")
-    # schedule.add_job(run_job_scraper,
-    #                  'interval', hours=24, start_date=first_runtime_obj, end_date='2050-01-01 06:00:00'
-    #                  )
-    # schedule.add_job(run_job_scraper, 'interval', hours=3)
-    # logging.info("Job added")
+    schedule.start()
+    logging.info("Started")
+    today = datetime.today()
+    first_run = today + timedelta(days=1)
+    first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
+    first_runtime_obj = datetime.strptime(first_runtime, "%y-%m-%d %H:%M:%S")
+    schedule.add_job(run_job_scraper, 'interval', hours=24, start_date=first_runtime_obj, end_date='2050-01-01 06:00:00')
+    logging.info("Job added")
 
 
 if __name__ == '__main__':

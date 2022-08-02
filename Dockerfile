@@ -30,15 +30,3 @@ USER hunter
 WORKDIR /app
 RUN pip3 install -r requirements.txt --no-warn-script-location
 CMD [ "/usr/bin/python3", "/app/app.py"]
-
-### Moving the python files to the app directory
-##COPY files/ /app
-##WORKDIR /app
-##RUN chown -R hunter:hunter /app
-## Switching to the hunter user and installing dependencies
-#USER hunter
-#WORKDIR /app
-## Installing the app dependencies
-#RUN pip3 install -r requirements.txt --no-warn-script-location
-## Starting the Flask App
-#CMD [ "/usr/bin/python3", "/app/app.py"]

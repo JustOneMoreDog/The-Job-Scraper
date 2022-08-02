@@ -8,10 +8,7 @@ choco install docker-desktop git -y
 refreshenv
 Write-Output "Pulling down the repository"
 git clone -b flask https://github.com/picnicsecurity/LinkedIn-Job-Scraper.git
-Set-Location "$($env:HOMEPATH)/LinkedIn-Job-Scraper"
-Start-Process 'C:\Program Files\Docker\Docker\Docker Desktop.exe' -Wait
-Write-Output "Pulling down repository"
 
-docker build -t job-scraper:latest .
-
+# For the docs
+# Set-Location "$($env:HOMEPATH)/LinkedIn-Job-Scraper"; docker build -t job-scraper:latest .; docker run --name jobhunter -p 8080:8080 -d job-scraper
 # Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/picnicsecurity/LinkedIn-Job-Scraper/flask/setup.ps1'))
