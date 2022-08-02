@@ -25,12 +25,12 @@ echo "Now setting up the job scraper image"
 cd ~
 git clone -b flask https://github.com/picnicsecurity/LinkedIn-Job-Scraper.git
 cd LinkedIn-Job-Scraper
-sudo docker build -t job-scraper1:latest .
+sudo docker build -t job-scraper:latest --build-arg TIMEZONE="$(cat /etc/timezone)" .
 
 clear
 echo "We have successfully built the job scraper image"
 echo "Starting the container"
-sudo docker run --name jobhunter -p 8080:8080 -d job-scraper
+sudo docker run --restart=always --name jobhunter -p 8080:8080 -d job-scraper
 
 host_ip="$(ip a | grep "inet" | grep -v "inet6\|127\|docker" | xargs | cut -d " " -f 2 | cut -d "/" -f 1)"
 web_address="http://$(host_ip):8080"
