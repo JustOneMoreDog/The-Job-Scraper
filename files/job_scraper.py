@@ -79,6 +79,7 @@ class JobScraper:
         ]}
         job["search"] = search
         job["remote"] = remote
+        job["industry"] = ''
         x = tag.find('time')
         if x:
             job["posted_time"] = x.attrs['datetime']
@@ -674,7 +675,7 @@ class JobScraper:
         end_content = int(time.time())
         p_time = int(time.time())
         logging.info("Organizing results")
-        blank_job = {"posted_time": "", "location": "", "title": "", "company": "",
+        blank_job = {"posted_time": "", "location": "", "title": "", "company": "", "industry": "",
                      "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
         good_jobs = []
         bad_jobs = []
