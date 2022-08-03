@@ -659,8 +659,8 @@ class JobScraper:
                 logging.info("Parsing %s" % job['url'])
                 job['content'], job['industry'] = self.get_job_content(job['url'], driver, SharedDriver())
             else:
-                logging.info("%s is being skipped due to being in the %s exclude list" % (job['url'], job['keywords']))
                 job['keywords'] = ','.join(keywords)
+                logging.info("%s is being skipped due to being in the %s exclude list" % (job['url'], job['keywords']))
                 job['content'] = """"
                 <html>
                 <body>
@@ -684,7 +684,7 @@ class JobScraper:
             keywords = []
             if any(l for l in excluded_industries if l.lower() in job['industry'].lower()):
                 job['keywords'] = "INDUSTRY"
-                job['rating'] = rating = -999
+                job['rating'] = -999
             if job['rating'] != 0:
                 logging.info("%s is being skipped due to being in the %s exclude list" % (job['url'], job['keywords']))
                 bad_jobs.append(job)
