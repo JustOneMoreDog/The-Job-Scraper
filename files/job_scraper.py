@@ -7,6 +7,7 @@ import urllib.parse as urlparse
 from datetime import datetime
 from functools import reduce
 from typing import Dict, Any
+import undetected_chromedriver as uc
 from urllib.parse import parse_qs
 
 import selenium.common.exceptions
@@ -18,6 +19,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from tabulate import tabulate
+
 
 
 def init_logging():
@@ -519,7 +521,8 @@ class JobScraper:
         </body>
         </html>
         """
-        path = os.path.join(path, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        path = os.path.join(path, timestamp)
         index_path = os.path.join(path, "index.html")
         # If the directory does not exist (it should not) we make it
         if not os.path.exists(path):
@@ -543,7 +546,7 @@ class JobScraper:
                     with open(os.path.join(path, content_html_path), "w", encoding='utf-8') as g:
                         g.write(soup.prettify())
                     # _blank makes it so that it opens up in a new tab
-                    content_flask_path = os.path.join(path, content_folder)
+                    content_flask_path = os.path.join(timestamp, content_folder)
                     a_tag = soup.new_tag('a', href=content_flask_path, target="_blank", rel="noopener noreferrer")
                     a_tag.string = "Content"
                     d['content'] = str(a_tag)
@@ -588,7 +591,8 @@ class JobScraper:
                 options.add_argument(option)
         options.add_argument("window-size=%s" % self.config['window_size'])
         options.add_argument('--log-level=2')
-        driver = Chrome(options=options)
+        # driver = Chrome(options=options)
+        driver = uc.Chrome(use_subprocess=True, options=options)
         driver.set_page_load_timeout(self.config['timeout'])
         logging.info("Loading previously found jobs")
         all_jobs = self.load_json_data("all_jobs.json") or []
@@ -636,7 +640,9 @@ class JobScraper:
                 options.add_argument(option)
         options.add_argument("window-size=%s" % self.config['window_size'])
         options.add_experimental_option('excludeSwitches', ['enable-automation'])
-        driver = Chrome(options=options)
+        # driver = Chrome(options=options)
+        driver = uc.Chrome(use_subprocess=True)
+        driver.options = options
         SharedDriver.set_instance(driver)
         # To help speed things up, we are going to not get the content for jobs that are in the exclude list
         for job in processed_data:
