@@ -7,19 +7,17 @@ import urllib.parse as urlparse
 from datetime import datetime
 from functools import reduce
 from typing import Dict, Any
-import undetected_chromedriver as uc
 from urllib.parse import parse_qs
 
 import selenium.common.exceptions
 import yaml
 from bs4 import BeautifulSoup
 from hed_utils.selenium import SharedDriver, FindBy
-from selenium.webdriver import Chrome
+from selenium.webdriver import Chrome, Remote
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from tabulate import tabulate
-
 
 
 def init_logging():
@@ -214,13 +212,15 @@ class JobScraper:
         logging.info(
             "(%s): starting job hunt for %s in %s with remote set to %s" % (search, search, location, str(remote)))
 
-        driver.get('https://www.linkedin.com/jobs')
+        # driver.get('https://www.linkedin.com/jobs')
+        driver.get('https://www.linkedin.com/jobs/engineering-jobs-columbia-md?trk=homepage-jobseeker_suggested-search&position=1&pageNum=0')
         SharedDriver().wait_for_page_load()
         wait_and_sleep(SharedDriver())
 
         # Typing in our search
         keywords_input = FindBy.NAME("keywords", visible_only=True)
         keywords_input.click()
+        keywords_input.clear()
         keywords_input.send_keys(search + Keys.ENTER)
         wait_and_sleep(SharedDriver())
 
@@ -238,19 +238,6 @@ class JobScraper:
         location_input.clear()
         location_input.send_keys(location + Keys.ENTER)
         wait_and_sleep(SharedDriver())
-
-        # Filtering by remote only jobs
-        if remote:
-            logging.info("(%s): Filtering in only remote jobs for %s in %s" % (search, search, location))
-            driver.find_elements_by_xpath(self.config['remote_button'])[0].click()
-            driver.find_elements_by_xpath(self.config['remote_label'])[0].click()
-            for button in driver.find_elements_by_xpath(self.config['done_button']):
-                try:
-                    button.click()
-                    break
-                except selenium.common.exceptions.ElementNotInteractableException:
-                    continue
-            wait_and_sleep(SharedDriver())
 
         # Limiting our search results to the past week
         driver.find_elements_by_xpath(self.config['any_time_button'])[0].click()
@@ -273,11 +260,16 @@ class JobScraper:
             return known_tags, total_valid_job_postings, complete_data
 
         # Limiting our search to full time positions
-        if driver.find_elements_by_xpath(self.config['job_type_button']):
+        if len(driver.find_elements_by_xpath(self.config['job_type_button'])) != 0:
             driver.find_elements_by_xpath(self.config['job_type_button'])[0].click()
         else:
-            driver.find_elements_by_xpath(self.config['more_filters_button'])[0].click()
-            driver.find_element_by_xpath(self.config['job_type_nested_button']).click()
+            if len(driver.find_elements_by_xpath(self.config['more_filters_button'])) != 0:
+                driver.find_elements_by_xpath(self.config['more_filters_button'])[0].click()
+                driver.find_element_by_xpath(self.config['job_type_nested_button']).click()
+            else:
+                logging.info(f"We could not find the job type button nor the more filters button for the {search}")
+                return known_tags, total_valid_job_postings, complete_data
+
         driver.find_elements_by_xpath(self.config['full_time_button'])[0].click()
         self.sleep(1)
         for b in driver.find_elements_by_xpath(self.config['done_button']):
@@ -285,6 +277,22 @@ class JobScraper:
                 b.click()
                 break
         wait_and_sleep(SharedDriver())
+
+        # Filtering by remote only jobs
+        if remote:
+            logging.info("(%s): Filtering in only remote jobs for %s in %s" % (search, search, location))
+            if len(driver.find_elements_by_xpath(self.config['remote_button'])) == 0:
+                logging.warning("No remote results found for the keyword: %s" % search)
+                return known_tags, total_valid_job_postings, complete_data
+            driver.find_elements_by_xpath(self.config['remote_button'])[0].click()
+            driver.find_elements_by_xpath(self.config['remote_label'])[0].click()
+            for button in driver.find_elements_by_xpath(self.config['done_button']):
+                try:
+                    button.click()
+                    break
+                except selenium.common.exceptions.ElementNotInteractableException:
+                    continue
+            wait_and_sleep(SharedDriver())
 
         if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
@@ -521,8 +529,7 @@ class JobScraper:
         </body>
         </html>
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        path = os.path.join(path, timestamp)
+        path = os.path.join(path, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
         index_path = os.path.join(path, "index.html")
         # If the directory does not exist (it should not) we make it
         if not os.path.exists(path):
@@ -546,7 +553,7 @@ class JobScraper:
                     with open(os.path.join(path, content_html_path), "w", encoding='utf-8') as g:
                         g.write(soup.prettify())
                     # _blank makes it so that it opens up in a new tab
-                    content_flask_path = os.path.join(timestamp, content_folder)
+                    content_flask_path = os.path.join(path, content_folder)
                     a_tag = soup.new_tag('a', href=content_flask_path, target="_blank", rel="noopener noreferrer")
                     a_tag.string = "Content"
                     d['content'] = str(a_tag)
@@ -591,15 +598,16 @@ class JobScraper:
                 options.add_argument(option)
         options.add_argument("window-size=%s" % self.config['window_size'])
         options.add_argument('--log-level=2')
-        # driver = Chrome(options=options)
-        driver = uc.Chrome(use_subprocess=True, options=options)
+        driver = Chrome(options=options)
+        # driver = Remote(command_executor='https://selenium.thejobscraper.com/wd/hub', options=options)
         driver.set_page_load_timeout(self.config['timeout'])
         logging.info("Loading previously found jobs")
         all_jobs = self.load_json_data("all_jobs.json") or []
         self.save_json_data(all_jobs, "all_jobs.json.old")
         data = []
         logging.info("Scraping LinkedIn for jobs")
-
+        # driver.get("https://www.google.com")
+        # input("Enter Once You See Google: ")
         processing_time += int(time.time()) - p_time
         start_scrape = int(time.time())
         for search in searches:
@@ -618,6 +626,7 @@ class JobScraper:
                     logging.warning("This is the URL that caused the error %s" % driver.current_url)
                     logging.warning("We are going to sleep for 5 and then retry. We have %d tries left" % (i - 1))
                     self.sleep(120)
+                    # input("Enter to continue: ")
                     i -= 1
             search_stop_time = int(time.time())
             search_time = search_stop_time - search_start_time
@@ -629,20 +638,19 @@ class JobScraper:
         logging.info("Backing up the scrape")
         self.save_json_data(processed_data, "scrape_backups/" + datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + ".json")
         end_scrape = int(time.time())
-        driver.close()
+        # driver.close()
         self.sleep(5)
 
         logging.info("Getting content for %d jobs" % len(processed_data))
         start_content = int(time.time())
-        options = Options()
-        if self.config['headless']:
-            for option in self.config['chrome_options']:
-                options.add_argument(option)
-        options.add_argument("window-size=%s" % self.config['window_size'])
-        options.add_experimental_option('excludeSwitches', ['enable-automation'])
-        # driver = Chrome(options=options)
-        driver = uc.Chrome(use_subprocess=True)
-        driver.options = options
+        #options = Options()
+        #if self.config['headless']:
+        #    for option in self.config['chrome_options']:
+        #        options.add_argument(option)
+        #options.add_argument("window-size=%s" % self.config['window_size'])
+        #options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        #driver = Chrome(options=options)
+        #driver = Remote(command_executor='https://selenium.thejobscraper.com/wd/hub', options=options)
         SharedDriver.set_instance(driver)
         # To help speed things up, we are going to not get the content for jobs that are in the exclude list
         for job in processed_data:
