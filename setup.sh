@@ -33,6 +33,6 @@ echo "Starting the container"
 sudo docker run --restart=always --name jobhunter -p 8080:8080 -d job-scraper
 
 host_ip="$(ip a | grep "inet" | grep -v "inet6\|127\|docker" | xargs | cut -d " " -f 2 | cut -d "/" -f 1)"
-web_address="http://$host_ip:8080"
+web_address="http://$(host_ip):8080"
 
 echo "Job scraper is now running and can be accessed by opening your web browsing and navigating to $(web_address)"

@@ -24,5 +24,3 @@ word_weights:
   travel: -100
 excluded_industries:
 - Staffing and Recruiting
-- IT Services and IT Consulting
-
