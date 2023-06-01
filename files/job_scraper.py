@@ -531,6 +531,7 @@ class JobScraper:
         """
         path = os.path.join(path, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
         index_path = os.path.join(path, "index.html")
+        logging.info(index_path)
         # If the directory does not exist (it should not) we make it
         if not os.path.exists(path):
             os.mkdir(path)
@@ -540,6 +541,7 @@ class JobScraper:
             for d in ordered_data:
                 # Rather than having the content in the table, we make a different html page for it
                 # This ensures that the table looks clean and is easy to read
+                soup = BeautifulSoup(html, "html.parser")
                 if d['content']:
                     # Since each job posting that we scrape is deemed unique by their url, and since each url will start
                     # the same, then the last section of the url is guaranteed to be unique. This ensures that we do not
@@ -547,7 +549,6 @@ class JobScraper:
                     content_folder = d['url'].split("/")[-1]
                     os.mkdir(os.path.join(path, content_folder))
                     content_html_path = os.path.join(content_folder, "content.html")
-                    soup = BeautifulSoup(html, "html.parser")
                     soup.body.append(d['content'])
                     # Writing the content to its own file
                     with open(os.path.join(path, content_html_path), "w", encoding='utf-8') as g:
@@ -557,6 +558,8 @@ class JobScraper:
                     a_tag = soup.new_tag('a', href=content_flask_path, target="_blank", rel="noopener noreferrer")
                     a_tag.string = "Content"
                     d['content'] = str(a_tag)
+                else:
+                    logging.info(f"{d['title']} did not have content")
                 post_link = soup.new_tag('a', href=d['url'], target="_blank", rel="noopener noreferrer")
                 post_link.string = "Job Posting"
                 d['url'] = str(post_link)
