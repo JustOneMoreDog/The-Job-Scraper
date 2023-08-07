@@ -8,16 +8,19 @@ from datetime import datetime
 from functools import reduce
 from typing import Dict, Any
 from urllib.parse import parse_qs
-
 import selenium.common.exceptions
 import yaml
 from bs4 import BeautifulSoup
-from hed_utils.selenium import SharedDriver, FindBy
+#from hed_utils.selenium import SharedDriver, FindBy
 from selenium.webdriver import Chrome, Remote
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from tabulate import tabulate
+import undetected_chromedriver as uc
+
+# (stolen) from hed_utils.selenium import SharedDriver, FindBy
+from scraper_utils import js_conditions
 
 
 def init_logging():
@@ -68,6 +71,25 @@ class JobScraper:
         time.sleep(x)
         self.sleep_total += x
 
+    def get_button_with_text(self, d, text):
+        logging.info(f"Trying to find a button with the text of: {text}")
+        button = None
+        buttons = d.find_elements(By.TAG_NAME, 'button')
+        if len(buttons) > 0:
+            for button in buttons:
+                if text.lower() in button.text.strip().lower():
+                    logging.info("Found")
+                    logging.info(button)
+                    return button
+        return button
+
+    # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
+    def wait_and_sleep(self, d):
+        js_conditions.wait_for_page_load(d)
+        self.validate_page(d)
+        js_conditions.wait_for_page_load(d)
+        self.sleep(5)
+
     def poc_function(self):
         logging.info("POC function checking in at %s. Search term values are %s" % (
         str(int(time.time())), ','.join(self.config['searches'])))
@@ -98,14 +120,12 @@ class JobScraper:
             job["url"] = url[:url.index("?")] if ("?" in url) else url
         return job
 
-    def get_job_content(self, url, driver, shared_driver):
+    def get_job_content(self, url, driver):
         retries = self.config['max_retries']
         backoff = 1
         while True:
             driver.get(url)
-            shared_driver.wait_for_page_load()
-            self.sleep(1)
-            self.validate_page(shared_driver)
+            self.self.wait_and_sleep(driver)
             if not self.check_for_429(driver, backoff):
                 break
             retries -= 1
@@ -121,7 +141,7 @@ class JobScraper:
                     element.click()
                     break
             self.sleep(.5)
-            soup = shared_driver.page_soup
+            soup = BeautifulSoup(driver.page_source)
             job_description = soup.find(
                 self.config['job_description_tag'],
                 class_=self.config['job_description_class']
@@ -165,7 +185,7 @@ class JobScraper:
                     # We now tell selenium to try and load the url we actually wanted to go to
                     driver.get(str(parse_qs(parsed.query)[check][0]))
                     # Then we tell it to wait for that page to load
-                    driver.wait_for_page_load()
+                    self.wait_and_sleep(driver)
                     # Then we make sure that we have not been 429-ed
                     self.check_for_429(driver, backoff)
                     break
@@ -178,7 +198,8 @@ class JobScraper:
     # Utility function for validate_page
     def check_for_429(self, driver, backoff):
         while True:
-            http_429_check = driver.find_elements_by_xpath(self.config['http_429_xpath'])
+            # http_429_check = driver.find_elements_by_xpath(self.config['http_429_xpath'])
+            http_429_check = driver.find_elements(By.XPATH, self.config['http_429_xpath'])
             if not http_429_check:
                 hit_with_the_429 = False
                 break
@@ -189,7 +210,7 @@ class JobScraper:
                 backoff += 1
                 logging.info("Refreshing the page")
                 driver.refresh()
-                driver.wait_for_page_load()
+                self.wait_and_sleep(driver)
                 self.sleep(1)
             if backoff >= 30:
                 raise Exception("We have been 429-ed by LinkedIn so many times that we need to full stop")
@@ -197,12 +218,6 @@ class JobScraper:
 
     def get_job_posts(self, location, timespan_button, driver, known_tags,
                       total_valid_job_postings, complete_data, day, search, remote, minimum_threshold):
-        # Inner function that tries to prevent us from getting 429-ed by putting in sleep statements
-        def wait_and_sleep(shared_driver):
-            shared_driver.wait_for_page_load()
-            self.validate_page(shared_driver)
-            shared_driver.wait_for_page_load()
-            self.sleep(1.5)
 
         # Inner function that will move to an element and then press tab and then enter
         # def send_tab_enter(element):
@@ -212,20 +227,28 @@ class JobScraper:
         logging.info(
             "(%s): starting job hunt for %s in %s with remote set to %s" % (search, search, location, str(remote)))
 
-        # driver.get('https://www.linkedin.com/jobs')
+        #driver.get('https://www.linkedin.com/jobs')
         driver.get('https://www.linkedin.com/jobs/engineering-jobs-columbia-md?trk=homepage-jobseeker_suggested-search&position=1&pageNum=0')
-        SharedDriver().wait_for_page_load()
-        wait_and_sleep(SharedDriver())
+        # SharedDriver().wait_for_page_load()
+        js_conditions.wait_for_page_load(driver)
+        self.wait_and_sleep(driver)
 
         # Typing in our search
-        keywords_input = FindBy.NAME("keywords", visible_only=True)
+        # keywords_input = FindBy.NAME("keywords", visible_only=True)
+        keywords_input = driver.find_elements(By.NAME, "keywords")
+        if len(keywords_input) > 0:
+            logging.info("Found keywords field")
+            keywords_input = keywords_input[0]
         keywords_input.click()
         keywords_input.clear()
         keywords_input.send_keys(search + Keys.ENTER)
-        wait_and_sleep(SharedDriver())
+        self.wait_and_sleep(driver)
 
         # Defining our location
-        location_input = FindBy.NAME("location", visible_only=True)
+        location_input = driver.find_elements(By.NAME, "location")
+        if len(location_input) > 0:
+            logging.info("Found location field")
+            location_input = location_input[0]
         try:
             location_input.click()
         except selenium.common.exceptions.NoSuchElementException as e:
@@ -233,84 +256,100 @@ class JobScraper:
             logging.warning("This is the URL that caused the error %s" % driver.current_url)
             logging.warning("Going to refresh the page and try again")
             driver.refresh()
-            wait_and_sleep(SharedDriver())
+            self.wait_and_sleep(driver)
             location_input.click()
         location_input.clear()
         location_input.send_keys(location + Keys.ENTER)
-        wait_and_sleep(SharedDriver())
+        self.wait_and_sleep(driver)
 
         # Limiting our search results to the past week
-        driver.find_elements_by_xpath(self.config['any_time_button'])[0].click()
-        timespan_buttons = driver.find_elements_by_xpath(timespan_button)
+        driver.find_elements(By.XPATH, self.config['any_time_button'])[0].click()
+        timespan_buttons = driver.find_elements(By.XPATH, timespan_button)
         if len(timespan_buttons) > 0:
-            driver.find_elements_by_xpath(timespan_button)[0].click()
+            timespan_buttons[0].click()
         else:
             logging.info("(%s): We could not find the timespan of %s" % (search, timespan_button))
         self.sleep(1)
-        for button in driver.find_elements_by_xpath(self.config['done_button']):
+        for button in driver.find_elements(By.XPATH, self.config['done_button']):
             try:
                 button.click()
                 break
             except selenium.common.exceptions.ElementNotInteractableException:
                 continue
-        wait_and_sleep(SharedDriver())
+        self.wait_and_sleep(driver)
 
         if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
             return known_tags, total_valid_job_postings, complete_data
 
         # Limiting our search to full time positions
-        if len(driver.find_elements_by_xpath(self.config['job_type_button'])) != 0:
-            driver.find_elements_by_xpath(self.config['job_type_button'])[0].click()
+        logging.info("Looking for job type button")
+        job_button = self.get_button_with_text(driver, 'Job Type')
+        input("1")
+        if job_button:
+            input("2")
+            job_button.click()
         else:
-            if len(driver.find_elements_by_xpath(self.config['more_filters_button'])) != 0:
-                driver.find_elements_by_xpath(self.config['more_filters_button'])[0].click()
+            logging.warning("Could not find the job type button. Looking for more filters button")
+            input("3")
+            if len(driver.find_elements(By.XPATH, self.config['more_filters_button'])) != 0:
+                input("4")
+                driver.find_elements(By.XPATH, self.config['more_filters_button'])[0].click()
                 driver.find_element_by_xpath(self.config['job_type_nested_button']).click()
             else:
                 logging.info(f"We could not find the job type button nor the more filters button for the {search}")
+                with open("dump.html", 'w') as f:
+                    f.write(BeautifulSoup(driver.page_source).prettify())
                 return known_tags, total_valid_job_postings, complete_data
 
-        driver.find_elements_by_xpath(self.config['full_time_button'])[0].click()
+        driver.find_elements(By.XPATH, self.config['full_time_button'])[0].click()
         self.sleep(1)
-        for b in driver.find_elements_by_xpath(self.config['done_button']):
+        for b in driver.find_elements(By.XPATH, self.config['done_button']):
             if "done" in b.text.lower():
                 b.click()
                 break
-        wait_and_sleep(SharedDriver())
+        self.wait_and_sleep(driver)
 
         # Filtering by remote only jobs
         if remote:
             logging.info("(%s): Filtering in only remote jobs for %s in %s" % (search, search, location))
-            if len(driver.find_elements_by_xpath(self.config['remote_button'])) == 0:
-                logging.warning("No remote results found for the keyword: %s" % search)
+            remote_button = self.get_button_with_text(driver, 'On-site')
+            if remote_button:
+                remote_button.click()
+            else:
+                logging.warning("No remote button found for the keyword: %s" % search)
                 return known_tags, total_valid_job_postings, complete_data
-            driver.find_elements_by_xpath(self.config['remote_button'])[0].click()
-            driver.find_elements_by_xpath(self.config['remote_label'])[0].click()
-            for button in driver.find_elements_by_xpath(self.config['done_button']):
+            remote_label = driver.find_elements(By.XPATH, self.config['remote_label'])
+            if len(remote_label) > 0:
+                remote_label[0].click()
+            else:
+                logging.warning("No remote label found for the keyword: %s" % search)
+                return known_tags, total_valid_job_postings, complete_data
+            for button in driver.find_elements(By.XPATH, self.config['done_button']):
                 try:
                     button.click()
                     break
                 except selenium.common.exceptions.ElementNotInteractableException:
                     continue
-            wait_and_sleep(SharedDriver())
+            self.wait_and_sleep(driver)
 
         if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
             return known_tags, total_valid_job_postings, complete_data
 
         # Limiting our Experience level to only certain levels
-        if driver.find_elements_by_xpath(self.config['more_filters_button']):
-            driver.find_elements_by_xpath(self.config['more_filters_button'])[0].click()
+        if driver.find_elements(By.XPATH, self.config['more_filters_button']):
+            driver.find_elements(By.XPATH, self.config['more_filters_button'])[0].click()
             self.sleep(.25)
-            driver.find_elements_by_xpath(self.config['exp_level_span_button'])[0].click()
-            for job_level in driver.find_elements_by_xpath(self.config['ul_li_filter_list']):
+            driver.find_elements(By.XPATH, self.config['exp_level_span_button'])[0].click()
+            for job_level in driver.find_elements(By.XPATH, self.config['ul_li_filter_list']):
                 if any(x for x in
                        [y for y in self.config['experience_levels'].keys() if self.config['experience_levels'][y]] if
                        x.lower() in job_level.text.lower()):
                     job_level.click()
         else:
-            driver.find_elements_by_xpath(self.config['exp_level_button'])[0].click()
-            job_levels = [j for j in driver.find_elements_by_xpath(self.config['div_filter_list']) if j.text and
+            driver.find_elements(By.XPATH, self.config['exp_level_button'])[0].click()
+            job_levels = [j for j in driver.find_elements(By.XPATH, self.config['div_filter_list']) if j.text and
                           len(j.text.split("(")) == 2]
             for job_level in job_levels:
                 if any(x for x in
@@ -318,11 +357,11 @@ class JobScraper:
                        if x.lower() in job_level.text.lower()):
                     job_level.click()
         self.sleep(.5)
-        for b in driver.find_elements_by_xpath(self.config['done_button']):
+        for b in driver.find_elements(By.XPATH, self.config['done_button']):
             if "done" in b.text.lower():
                 b.click()
                 break
-        wait_and_sleep(SharedDriver())
+        self.wait_and_sleep(driver)
 
         if len(driver.find_elements(By.CLASS_NAME, self.config['no_results'])) != 0:
             logging.warning("No results found for the keyword: %s" % search)
@@ -332,16 +371,16 @@ class JobScraper:
         # Handling the infinite scroll
         while True:
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            wait_and_sleep(SharedDriver())
+            self.wait_and_sleep(driver)
             newHeight = driver.execute_script("return document.body.scrollHeight")
             if newHeight == last_height:
                 try:
                     logging.info("(%s): Reached bottom. Seeing if there are more jobs" % search)
-                    more_jobs = driver.find_elements_by_xpath(self.config['xpath_see_more_jobs_button'])
+                    more_jobs = driver.find_elements(By.XPATH, self.config['xpath_see_more_jobs_button'])
                     if more_jobs[0].is_displayed():
                         logging.info("(%s): More jobs found" % search)
                         more_jobs[0].click()
-                        wait_and_sleep(SharedDriver())
+                        self.wait_and_sleep(driver)
                     else:
                         logging.info("(%s): No more jobs found" % search)
                         break
@@ -353,7 +392,7 @@ class JobScraper:
                     break
                     # return []
             # Once it has loaded the new results we get the contents of the page and scrape the job postings
-            page_soup = SharedDriver().page_soup
+            page_soup = BeautifulSoup(driver.page_source)
             tags = []
             for ul in page_soup.findAll('ul', class_=self.config['job_results_selector']):
                 for li in ul.findAll('li'):
@@ -395,7 +434,7 @@ class JobScraper:
         return known_tags, total_valid_job_postings, complete_data
 
     def scrape_jobs(self, search: str, locations: list, minimum_threshold: int, driver):
-        SharedDriver.set_instance(driver)
+        # SharedDriver.set_instance(driver)
 
         known_tags = []
         total_valid_job_postings = 0
@@ -601,8 +640,9 @@ class JobScraper:
                 options.add_argument(option)
         options.add_argument("window-size=%s" % self.config['window_size'])
         options.add_argument('--log-level=2')
-        driver = Chrome(options=options)
-        # driver = Remote(command_executor='https://selenium.thejobscraper.com/wd/hub', options=options)
+        # driver = Chrome(options=options)
+        # driver = uc.Chrome(executable_path=r'/usr/local/bin/chromedriver', options=options)
+        driver = Remote(command_executor='https://selenium.thejobscraper.com/wd/hub', options=options)
         driver.set_page_load_timeout(self.config['timeout'])
         logging.info("Loading previously found jobs")
         all_jobs = self.load_json_data("all_jobs.json") or []
@@ -646,15 +686,15 @@ class JobScraper:
 
         logging.info("Getting content for %d jobs" % len(processed_data))
         start_content = int(time.time())
-        #options = Options()
-        #if self.config['headless']:
+        # options = Options()
+        # if self.config['headless']:
         #    for option in self.config['chrome_options']:
         #        options.add_argument(option)
-        #options.add_argument("window-size=%s" % self.config['window_size'])
-        #options.add_experimental_option('excludeSwitches', ['enable-automation'])
-        #driver = Chrome(options=options)
-        #driver = Remote(command_executor='https://selenium.thejobscraper.com/wd/hub', options=options)
-        SharedDriver.set_instance(driver)
+        # options.add_argument("window-size=%s" % self.config['window_size'])
+        # options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        # driver = Chrome(options=options)
+        # driver = Remote(command_executor='https://selenium.thejobscraper.com/wd/hub', options=options)
+        # SharedDriver.set_instance(driver)
         # To help speed things up, we are going to not get the content for jobs that are in the exclude list
         for job in processed_data:
             rating = 0
@@ -674,7 +714,7 @@ class JobScraper:
             job['rating'] = rating
             if rating == 0:
                 logging.info("Parsing %s" % job['url'])
-                job['content'], job['industry'] = self.get_job_content(job['url'], driver, SharedDriver())
+                job['content'], job['industry'] = self.get_job_content(job['url'], driver)
             else:
                 job['keywords'] = ','.join(keywords)
                 logging.info("%s is being skipped due to being in the %s exclude list" % (job['url'], job['keywords']))
