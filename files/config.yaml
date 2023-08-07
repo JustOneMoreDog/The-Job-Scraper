@@ -1,14 +1,13 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
-headless: true
+headless: false
 timeout: 10
 max_retries: 3
 scrape_all_last_day_jobs: true
-post_script_console_report: true
 include_remote: true
 remote_only: true
 save_to_html: true
 maximum_valid_job_postings: 1000
-html_folder: "/var/www/jobhunter"
+html_folder: "/app/templates"
 remote_location: "United States"
 window_size: "1920,1080"
 chrome_options:
@@ -21,7 +20,6 @@ any_time_button: "//button[contains(text(), 'Any Time')]"
 past_month_button: "//label[contains(text(), 'Past Month')]"
 past_week_button: "//label[contains(text(), 'Past Week')]"
 past_day_button: "//label[contains(text(), 'Past 24 hours')]"
-job_type_button: "//button[contains(text(), 'Job Type')]"
 job_type_nested_button: "//button/span[contains(text(), 'Job Type')]"
 full_time_button: "//label[contains(text(), 'Full-time')]"
 done_button: "//button[contains(text(), 'Done')]"
@@ -30,7 +28,7 @@ exp_level_span_button: "//button/span[contains(text(), 'Experience Level')]"
 exp_level_button: "//button[contains(text(), 'Experience Level')]"
 ul_li_filter_list: "//ul[contains(@class, 'filter-list__list')]/li"
 div_filter_list: "//div[contains(@class, 'filter-values-container__filter-value')]"
-no_results: "//div[contains(@class, 'empty-results-pivot')]"
+no_results: "no-results__main-title-keywords"
 job_results_selector: "jobs-search__results-list"
 job_location: "job-search-card__location"
 job_description_show_more: "//button[contains(text(), 'Show more')]"
@@ -40,3 +38,5 @@ job_description_tag: "div"
 http_429_xpath: "//div[contains(text(), 'HTTP ERROR 429')]"
 remote_button: "//button[contains(text(), 'On-site/Remote')]"
 remote_label: "//label[contains(text(), 'Remote')]"
+criteria_list: "description__job-criteria-list"
+criteria_list_subheader: "description__job-criteria-subheader"

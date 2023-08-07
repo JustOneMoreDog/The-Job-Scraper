@@ -1,0 +1,26 @@
+excluded_companies:
+- ClearanceJobs
+excluded_locations:
+- REMOTE
+excluded_title_keywords:
+- Manager
+experience_levels:
+  Associate: true
+  Director: false
+  Entry level: true
+  Internship: false
+  Mid-Senior level: false
+locations:
+- Washington DC-Baltimore Area
+minimum_jobs_per_search: 25
+searches:
+- Cloud Engineer
+- Security Engineer
+word_weights:
+  ansible: 15
+  clearance: -50
+  kubernetes: 10
+  terraform: 15
+  travel: -100
+excluded_industries:
+- Staffing and Recruiting
