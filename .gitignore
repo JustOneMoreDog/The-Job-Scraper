@@ -3,6 +3,7 @@
 /venv
 # Ignore any cache files
 /files/__pycache__
+/files/scraper_utils/__pycache__
 files/cache/*
 !files/cache/.keep
 # Ignore all the files created by the job scraper

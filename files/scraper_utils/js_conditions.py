@@ -154,7 +154,7 @@ class AngularDefined(JsCondition):
 
 class AngularReady(JsCondition):
     name = "angular_ready"
-    script = "return angular.element(document).injector().get('$http').pendingRequests.length == 0;"
+    script = "return angular.posting_element(document).injector().get('$http').pendingRequests.length == 0;"
     confirmations_needed = 10
     timeout = 10
     poll_frequency = 0.005
