@@ -11,7 +11,6 @@ from urllib.parse import parse_qs
 import selenium.common.exceptions
 import yaml
 from bs4 import BeautifulSoup
-#from hed_utils.selenium import SharedDriver, FindBy
 from selenium.webdriver import Chrome, Remote
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -219,9 +218,9 @@ class JobScraper:
     def get_job_posts(self, location, timespan_button, driver, known_tags,
                       total_valid_job_postings, complete_data, day, search, remote, minimum_threshold):
 
-        # Inner function that will move to an element and then press tab and then enter
-        # def send_tab_enter(element):
-        #     ActionChains(driver).move_to_element(element).send_keys(Keys.TAB).send_keys(Keys.ENTER).perform()
+        # Inner function that will move to an posting_element and then press tab and then enter
+        # def send_tab_enter(posting_element):
+        #     ActionChains(driver).move_to_element(posting_element).send_keys(Keys.TAB).send_keys(Keys.ENTER).perform()
 
         # valid_job_postings = 0
         logging.info(
@@ -620,6 +619,7 @@ class JobScraper:
             html_path = None
 
         # Loading user defined customizations
+        ## EXCEPT THIS BLOCK TBD
         p_time = int(time.time())
         processing_time = 0
         searches = self.config['searches']
@@ -630,6 +630,7 @@ class JobScraper:
         excluded_title_keywords = self.config['excluded_title_keywords']
         excluded_industries = self.config['excluded_industries']
         word_weights = self.config['word_weights']
+        ## EXCEPT THIS BLOCK TBD
 
         # We are statically defining that the chrome window be 1920x1080 so that we can have consistency
         # If we always know that the window will X by Y size, then we will have an easier time finding the
@@ -647,6 +648,7 @@ class JobScraper:
         logging.info("Loading previously found jobs")
         all_jobs = self.load_json_data("all_jobs.json") or []
         self.save_json_data(all_jobs, "all_jobs.json.old")
+        ## ABOVE IS DONE
         data = []
         logging.info("Scraping LinkedIn for jobs")
         # driver.get("https://www.google.com")

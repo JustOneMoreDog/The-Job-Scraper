@@ -17,10 +17,12 @@ from flask_wtf import FlaskForm
 from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExcludedIndustries, ExcludedLocationsForm, \
     ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles
 from wtforms import SelectField
+import platform
+import os
 
 
 app_config = {
-    "SECRET_KEY": "makesuretochangethisbeforehittingcommit",
+    "SECRET_KEY": "wearenotreallykeepingsecretssowhatever",
     "CACHE_TYPE": "SimpleCache",
     "CACHE_DEFAULT_TIMEOUT": 0,
     "CACHE_DIR": "/app/cache/"
@@ -28,11 +30,12 @@ app_config = {
 app = Flask(__name__)
 app.config.from_mapping(app_config)
 cache = Cache(app)
-customizations_path = "/app/customizations.yaml"
-customizations_backup_path = "/app/customizations_backups/"
+working_directory = "C:\\Users\\Name\\Documents\\GitHub\\The-Job-Scraper\\files" if platform.system() == 'Windows' else "/app"
+customizations_path = os.path.join(working_directory, "customizations.yaml")
+customizations_backup_path = os.path.join(working_directory, "customizations_backups")
 
 
-def init_logging():
+def init_logging() -> None:
     # Setting up our log files
     if not os.path.exists("flask_logs"):
         os.mkdir("flask_logs")
@@ -48,19 +51,20 @@ def init_logging():
     logging.info("Logging has been setup for flask")
 
 
-def save_customizations(path):
+def save_customizations(path) -> None:
     with open(path, "w") as f:
         yaml.dump(cache.get("customizations"), f)
 
 
-def load_customizations(path):
+def load_customizations(path) -> None:
     with open(path, "r") as f:
         cache.set("customizations", yaml.load(f, Loader=yaml.FullLoader))
 
 
-def get_job_scrapes():
-    job_data_list = list()
-    for x in os.listdir('/app/templates'):
+def get_job_scrapes() -> list:
+    job_data_list = []
+    templates_directory = os.path.join(working_directory, 'templates')
+    for x in os.listdir(templates_directory):
         if os.path.isdir(os.path.join('/app/templates', x)) and x != 'Welcome Page':
             job_data_list.append(x)
     job_data_list.sort(reverse=True)
@@ -68,7 +72,7 @@ def get_job_scrapes():
     return job_data_list
 
 
-def clear_input_validation_checks():
+def clear_input_validation_checks() -> None:
     customization_errors = dict()
     for k in dict(cache.get("customizations")).keys():
         customization_errors[k] = False
@@ -107,7 +111,7 @@ executors = {
 schedule = BackgroundScheduler(timezone='America/New_York', executors=executors)
 
 
-def check_scraper():
+def check_scraper() -> dict:
     is_running = [proc.cmdline() for proc in psutil.process_iter()
                   if '/usr/bin/python3' in proc.cmdline() and '/app/job_scraper.py' in proc.cmdline()
                   ]
@@ -409,7 +413,7 @@ def process_customizations(r):
 
 
 def run_job_scraper():
-    subprocess.run(['/usr/bin/python3', '/app/job_scraper.py'])
+    subprocess.run(['/usr/bin/python3', '/app/job_scraper_new.py'])
 
 
 if not schedule.running:
@@ -420,13 +424,15 @@ if not schedule.running:
     first_run = today + timedelta(days=1)
     first_runtime = first_run.strftime("%y-%m-%d 05:00:00")
     first_runtime_obj = datetime.strptime(first_runtime, "%y-%m-%d %H:%M:%S")
-    schedule.add_job(run_job_scraper, 'interval', hours=24, start_date=first_runtime_obj, end_date='2050-01-01 06:00:00')
+    schedule.add_job(
+        run_job_scraper,
+        'interval',
+        hours=24,
+        start_date=first_runtime_obj,
+        end_date='2050-01-01 06:00:00'
+    )
     logging.info("Job added")
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8080)
-
-# https://blog.jcharistech.com/2019/12/12/how-to-render-markdown-in-flask/
-# https://www.linkedin.com/jobs/view/security-engineer-ii-at-amazon-3024145334/
-# it picked up CKA but it was just package so maybe I need to split the content string by whitespace and then loop through that
+    app.run(host="127.0.0.1", port=8080)
