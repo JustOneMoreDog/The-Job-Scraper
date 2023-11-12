@@ -1,7 +1,7 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
 jobs_filepath: "all_jobs.json"
-html_folder: "C:/Users/Name/Documents/GitHub/The-Job-Scraper/files/templates" # "/app/templates"
-chrome_driver_executable_path: "C:/selenium/chromedriver-win64/chromedriver.exe" # "/usr/local/bin/chromedriver"
+html_folder: "/app/templates"
+chrome_driver_executable_path: "/usr/local/bin/chromedriver"
 window_size: "1920,1080"
 headless: true
 starting_url: "https://www.linkedin.com/jobs/engineering-jobs-columbia-md?trk=homepage-jobseeker_suggested-search&position=1&pageNum=0"

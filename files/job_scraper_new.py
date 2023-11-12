@@ -64,8 +64,8 @@ class TheJobScraper:
         # This helps lower the amount of work that needs to happen
         self.new_good_job_scrapes_for_search = 0
         self.log(f"Successfully initialized the job scraper")
-        self.log(f"-----\nApplication Configuration:\n{self.app_config}\n-----")
-        self.log(f"-----\nSearch Customizations:\n{self.customizations}\n-----")
+        self.log(f"\n-----\nApplication Configuration:\n{self.app_config}\n-----")
+        self.log(f"\n-----\nSearch Customizations:\n{self.customizations}\n-----")
 
     def log(self, message: str) -> None:
         prefix = f"{self.current_search}:{self.current_location}:{self.current_timespan}: "
