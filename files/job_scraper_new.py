@@ -22,7 +22,7 @@ import random
 from tabulate import tabulate
 
 # Global configuration for our exponential backoff
-debug = True
+debug = False
 minimum_jitter = 2
 maximum_jitter = 5
 exponential_jitter_wait = wait_exponential_jitter(5, 1200, 5, random.uniform(minimum_jitter, maximum_jitter))
@@ -44,7 +44,7 @@ class ElementNotFoundException(Exception):
 class TheJobScraper:
 
     def __init__(self):
-        self.working_directory = "C:\\Users\\Name\\Documents\\GitHub\\The-Job-Scraper\\files" if platform.system() == 'Windows' else "/app"
+        self.working_directory = "/app"
         os.chdir(self.working_directory)
         self.original_url = ""
         self.init_logging()
@@ -60,12 +60,12 @@ class TheJobScraper:
         self.current_location = ""
         self.current_timespan = ""
         # For each search in each location we will break out if we go over the threshold that
-        # is set by the app_config['minimum_good_results_per_search_per_location']
+        # is set by the customizations['minimum_good_results_per_search_per_location']
         # This helps lower the amount of work that needs to happen
         self.new_good_job_scrapes_for_search = 0
         self.log(f"Successfully initialized the job scraper")
-        self.log(f"-----\nApplication Configuration:\n{self.app_config}\n-----")
-        self.log(f"-----\nSearch Customizations:\n{self.customizations}\n-----")
+        self.log(f"\n-----\nApplication Configuration:\n{self.app_config}\n-----")
+        self.log(f"\n-----\nSearch Customizations:\n{self.customizations}\n-----")
 
     def log(self, message: str) -> None:
         prefix = f"{self.current_search}:{self.current_location}:{self.current_timespan}: "
@@ -194,7 +194,7 @@ class TheJobScraper:
 
     def get_job_postings(self, search: str, location: str, timespan: str, timespan_button_path: str) -> None:
         # Quick breakout check that will prevent us from doing extra work should we already be over the min threshold
-        if self.new_good_job_scrapes_for_search >= self.app_config['minimum_good_results_per_search_per_location']:
+        if self.new_good_job_scrapes_for_search >= self.customizations['minimum_good_results_per_search_per_location']:
             self.log("Breaking out because we have found enough good jobs")
             return
         self.load_url(self.app_config['starting_url'])
@@ -321,7 +321,7 @@ class TheJobScraper:
     def get_all_job_postings(self) -> None:
         previous_index = 0
         iteration = 0
-        while self.new_good_job_scrapes_for_search < self.app_config['minimum_good_results_per_search_per_location']:
+        while self.new_good_job_scrapes_for_search < self.customizations['minimum_good_results_per_search_per_location']:
             iteration += 1
             self.log(f"We are on iteration {iteration} with {self.new_good_job_scrapes_for_search} good posts")
             more_jobs_to_load = self.scroll_to_the_infinite_bottom()

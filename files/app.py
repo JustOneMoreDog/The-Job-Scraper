@@ -30,7 +30,7 @@ app_config = {
 app = Flask(__name__)
 app.config.from_mapping(app_config)
 cache = Cache(app)
-working_directory = "C:\\Users\\Name\\Documents\\GitHub\\The-Job-Scraper\\files" if platform.system() == 'Windows' else "/app"
+working_directory = "/app"
 customizations_path = os.path.join(working_directory, "customizations.yaml")
 customizations_backup_path = os.path.join(working_directory, "customizations_backups")
 
@@ -190,7 +190,7 @@ def displays_jobs_set():
 def customizations_get():
     customizations = cache.get("customizations")
     search_form_data = getFormData('search_term_label', 'searches', customizations)
-    min_jobs_form_data = getFormData('min_jobs_label', 'minimum_jobs_per_search', customizations)
+    min_jobs_form_data = getFormData('min_jobs_label', 'minimum_good_results_per_search_per_location', customizations)
     location_form_data = getFormData('location_label', 'locations', customizations)
     experience_form_data = getFormData('experience_level_label', 'experience_levels', customizations)
     excluded_location_form_data = getFormData('exclude_location_label', 'excluded_locations', customizations)
@@ -293,7 +293,7 @@ def process_customizations(r):
     curr = dict(cache.get("customizations"))
     data = {
         'searches': [],
-        'minimum_jobs_per_search': 0,
+        'minimum_good_results_per_search_per_location': 0,
         'locations': [],
         'experience_levels': {},
         'excluded_locations': [],
@@ -309,7 +309,7 @@ def process_customizations(r):
         elif 'search_term' in k:
             data['searches'].append(str(v).strip())
         elif 'min_jobs' in k:
-            data['minimum_jobs_per_search'] = str(v)
+            data['minimum_good_results_per_search_per_location'] = str(v)
         elif '-location' in k:
             data['locations'].append(str(v).strip())
         elif 'exclude_location' in k:
@@ -360,7 +360,7 @@ def process_customizations(r):
                     needs_error_element = True
                     message = "Weights must be either a positive or negative number"
                     break
-        elif k == 'minimum_jobs_per_search':
+        elif k == 'minimum_good_results_per_search_per_location':
             if v.isnumeric() and int(v) > 0:
                 data[k] = int(v)
             else:
