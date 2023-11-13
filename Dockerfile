@@ -22,7 +22,7 @@ RUN useradd -m -s /bin/bash hunter && \
 # Setting up the application files
 USER hunter
 WORKDIR /home/hunter
-RUN git clone -b flask https://github.com/picnicsecurity/LinkedIn-Job-Scraper.git && \
+RUN git clone -b refactor https://github.com/JustOneMoreDog/The-Job-Scraper.git && \
     cp LinkedIn-Job-Scraper/files/customizations_default.yaml LinkedIn-Job-Scraper/files/customizations.yaml
 USER root
 RUN ln -s /home/hunter/LinkedIn-Job-Scraper/files /app && \
