@@ -30,9 +30,6 @@ Have a Python web application that will act as the front end of the LinkedIn Job
         * Anything that has a greater than zero rating is considered good. 
       * Total number of bad job postings scraped
     * A section that allows the user to select previous job scrapings and have the program use [NLP](https://medium.com/data-marketing-philosophy/use-python-and-nlp-to-boost-your-resume-e4691a58bcc9) or similar to then show the common keywords across those job postings
-  * `/documentation`
-    * Has a brief overview of what each part of the site does
-    * Has a link to the Github repository
 
 ### Layout and Design
 

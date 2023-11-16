@@ -17,7 +17,7 @@
 </head>
 <body>
     <nav>
-        <a href="/">Home</a>
+        <a href="/files/static">Home</a>
         <a href="/customizations">Customizations</a>
         <a href="#">Documentation</a>
     </nav>

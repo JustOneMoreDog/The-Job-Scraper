@@ -22,8 +22,13 @@ files/scraper_logs/*
 /files/templates/*
 # Except for the default templates used for the web gui
 !/files/templates/Welcome Page/
-!/files/templates/base.html
-!/files/templates/customizations.html
+!/files/templates/base.html.old
+!/files/templates/customizations.html.old
+!/files/templates/index.html.old
+# NEW TEMPLATES
 !/files/templates/index.html
+!/files/templates/customizations.html
+!/files/templates/statistics.html
+!/files/templates/applications.html
 /files/customizations.yaml
 *.log

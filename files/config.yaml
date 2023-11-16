@@ -1,10 +1,10 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
 jobs_filepath: "all_jobs.json"
-html_folder: "/app/templates"
-chrome_driver_executable_path: "/usr/local/bin/chromedriver"
+html_folder: "/app/templates" #'C:/Users/Name/Documents/GitHub/The-Job-Scraper/files/templates'
+chrome_driver_executable_path: "/home/sandwich/The-Job-Scraper/chromedriver/chromedriver" #'C:/selenium/chromedriver-win64/chromedriver.exe' #"/usr/local/bin/chromedriver"
 window_size: "1920,1080"
 headless: true
-starting_url: "https://www.linkedin.com/jobs/engineering-jobs-columbia-md?trk=homepage-jobseeker_suggested-search&position=1&pageNum=0"
+starting_url: "https://www.linkedin.com/jobs/engineering-jobs-columbia-md"
 http_429_xpath: "//div[contains(text(), 'HTTP ERROR 429')]"
 redirect_checks:
   - "sessionRedirect"
@@ -36,3 +36,5 @@ company_name_check: "//span[contains(@class, 'topcard__flavor')]"
 job_posting_industry: "//li[contains(@class, 'job-criteria-item')]"
 job_posting_location: "//span[contains(@class, 'location')]"
 company_name_pre_request: "//a[contains(@class, 'hidden-nested-link')]"
+keywords_input_box: "job-search-bar-keywords"
+location_input_box: "job-search-bar-location"

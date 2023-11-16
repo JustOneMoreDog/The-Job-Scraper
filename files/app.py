@@ -413,7 +413,7 @@ def process_customizations(r):
 
 
 def run_job_scraper():
-    subprocess.run(['/usr/bin/python3', '/app/job_scraper_new.py'])
+    subprocess.run(['/home/sandwich/The-Job-Scraper/virtualenv/bin/python3', '/app/job_scraper_new.py'])
 
 
 if not schedule.running:

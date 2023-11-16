@@ -44,7 +44,7 @@ class ElementNotFoundException(Exception):
 class TheJobScraper:
 
     def __init__(self):
-        self.working_directory = "/app"
+        self.working_directory = "/app" # 'C:/Users/Name/Documents/GitHub/The-Job-Scraper/files/'
         os.chdir(self.working_directory)
         self.original_url = ""
         self.init_logging()
@@ -135,17 +135,20 @@ class TheJobScraper:
         # Rather than having the content in the table, we make a different html page for it
         # This ensures that the table looks clean and is easy to read
         content_folder_name = job_posting['url'].split("/")[-1]
-        content_folder_path = os.path.join(self.html_output_directory, content_folder_name)
-        os.mkdir(content_folder_path)
-        content_html_path = os.path.join(content_folder_path, "content.html")
-        soup = BeautifulSoup(self.get_base_html(), "html.parser")
-        soup.body.append(job_posting['content'])
+        content_folder_full_path = os.path.join(self.html_output_directory, content_folder_name)
+        os.mkdir(content_folder_full_path)
+        content_html_path = os.path.join(content_folder_full_path, "content.html")
+        page_soup = BeautifulSoup(self.get_base_html(), "html.parser")
+        content_soup = BeautifulSoup(job_posting['content'], "html.parser")
+        page_soup.body.append(content_soup)
         with open(content_html_path, "w", encoding='utf-8') as f:
-            f.write(soup.prettify())
+            f.write(page_soup.prettify())
         # Now we modify the content data to be a link to this newly created page
-        a_tag = soup.new_tag('a', href=content_folder_path, target="_blank", rel="noopener noreferrer")
+        relative_html_output_directory = self.html_output_directory.split("/")[-1]
+        content_folder_relative_path = os.path.join(relative_html_output_directory, content_folder_name)
+        a_tag = page_soup.new_tag('a', href=content_folder_relative_path, target="_blank", rel="noopener noreferrer")
         a_tag.string = "Content"
-        job_posting['content'] = str(a_tag)
+        job_posting['content'] = str(a_tag.prettify())
 
     @staticmethod
     def get_base_html() -> str:
@@ -234,13 +237,13 @@ class TheJobScraper:
         self.load_url()
 
     def search_for_jobs_with_phrase(self, search: str) -> None:
-        keywords_input_box = self.get_web_element(By.NAME, "keywords")
+        keywords_input_box = self.get_web_element(By.ID, self.app_config['keywords_input_box'])
         keywords_input_box.click()
         keywords_input_box.clear()
         keywords_input_box.send_keys(search)
 
     def limit_search_results_to_location(self, location: str) -> None:
-        location_input = self.get_web_element(By.NAME, "location")
+        location_input = self.get_web_element(By.ID, self.app_config['location_input_box'])
         location_input.click()
         location_input.clear()
         location_input.send_keys(location + Keys.ENTER)
@@ -606,9 +609,10 @@ class JobPosting:
         self.title = self.url_element.text.strip()
 
     def get_job_posting_company_pre_request(self) -> None:
-        hidden_company_tag = self.get_web_element(
-            By.XPATH, self.app_config["company_name_pre_request"], self.posting_element
-        )
+        hidden_company_tags = self.driver.find_elements(By.XPATH, self.app_config["company_name_pre_request"])
+        if not hidden_company_tags:
+            raise ElementNotFoundException("Could not find the hidden company name tags")
+        hidden_company_tag = hidden_company_tags[self.element_index]
         self.company = hidden_company_tag.text.strip()
 
     @retry(
@@ -713,8 +717,9 @@ class JobPosting:
 
     def get_job_posting_content(self) -> str:
         job_posting_details = self.get_web_element(By.XPATH, self.app_config['job_posting_details_section'])
-        job_posting_details_content = job_posting_details.text
-        return job_posting_details_content
+        job_posting_content_html = job_posting_details.get_attribute('innerHTML')
+        job_posting_details_soup = BeautifulSoup(job_posting_content_html, "html.parser")
+        return str(job_posting_details_soup.prettify())
 
     def get_job_posting_date(self) -> str:
         job_posting_date_element = self.get_web_element(
@@ -746,26 +751,28 @@ class JobPosting:
 if __name__ == '__main__':
     scraper = TheJobScraper
     try:
-        total = []
-        for i in range(0, 10):
-            start = int(time.time())
-            scraper = TheJobScraper()
-            scraper.scrape_jobs_from_linkedin()
-            finish = int(time.time())
-            run_time = finish - start
-            total.append(run_time)
-            formatted_run_time = str(timedelta(seconds=run_time))
-            print(f"The job scraper has finished iteration {i} all tasks with a runtime of {formatted_run_time}")
-        total_time = 0
-        print("RUNTIMES")
-        for run_time in total:
-            formatted_run_time = str(timedelta(seconds=run_time))
-            print(formatted_run_time)
-            total_time += run_time
-        print("AVERAGE")
-        average = total_time / 10
-        formatted_run_time = str(timedelta(seconds=int(average)))
-        print(formatted_run_time)
+        # total = []
+        # for i in range(0, 10):
+        #     start = int(time.time())
+        #     scraper = TheJobScraper()
+        #     scraper.scrape_jobs_from_linkedin()
+        #     finish = int(time.time())
+        #     run_time = finish - start
+        #     total.append(run_time)
+        #     formatted_run_time = str(timedelta(seconds=run_time))
+        #     print(f"The job scraper has finished iteration {i} all tasks with a runtime of {formatted_run_time}")
+        # total_time = 0
+        # print("RUNTIMES")
+        # for run_time in total:
+        #     formatted_run_time = str(timedelta(seconds=run_time))
+        #     print(formatted_run_time)
+        #     total_time += run_time
+        # print("AVERAGE")
+        # average = total_time / 10
+        # formatted_run_time = str(timedelta(seconds=int(average)))
+        # print(formatted_run_time)
+        scraper = TheJobScraper()
+        scraper.scrape_jobs_from_linkedin()
         scraper.driver.close()
     except Exception as e:
         screenshot = f"error_{str(int(time.time()))}.png"

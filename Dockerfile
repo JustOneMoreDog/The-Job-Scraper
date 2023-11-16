@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN echo "The timezone is ${TIMEZONE}"
 ENV TZ="${TIMEZONE}"
 RUN apt-get update -y && apt-get upgrade -y
-RUN apt-get install -y python3 wget unzip python3-pip git tzdata
+RUN apt-get install -y python3 python3-pip git tzdata wget unzip
 # Installing Google Chrome
 RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt install -y ./google-chrome-stable_current_amd64.deb && \
@@ -31,3 +31,6 @@ USER hunter
 WORKDIR /app
 RUN pip3 install -r requirements.txt --no-warn-script-location
 CMD [ "/usr/bin/python3", "/app/app.py"]
+
+
+# version=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
