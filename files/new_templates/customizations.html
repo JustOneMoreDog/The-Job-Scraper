@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 
 <head>
     <meta charset="UTF-8">
@@ -66,7 +66,7 @@
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link" aria-current="page" href="/">Home</a>
+                        <a class="nav-link active" aria-current="page" href="index.html">Home</a>
                     </li>
 
                     <li class="nav-item">
@@ -93,23 +93,6 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 
-    <!-- scraper status -->
-    <div class="container mt-5">
-        <div class="card">
-            <div class="card-header">
-                <h4 class="card-title">Scraper Status</h4>
-            </div>
-            <div class="card-body">
-                <p class="card-text"><strong>Status:</strong> <span id="status"></span></p>
-                <p class="card-text"><strong>Running Time:</strong> <span id="runningTime"></span></p>
-                <p class="card-text"><strong>Hours Until Next Run:</strong> <span id="nextRun"></span></p>
-            </div>
-            <div class="card-footer text-muted">
-                Last updated: <span id="lastUpdated"></span>
-            </div>
-        </div>
-
-    </div>
 
     <!-- edit customizations -->
     <div class="container mt-5">
@@ -149,6 +132,16 @@
             </div>
 
             <div class="row mt-2">
+                <label for="excluded_industries">Excluded Industries</label>
+                <select id="excluded_industries" class="form-control select_field" multiple="multiple">
+                    <option value="Software">Software</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Retail">Retail</option>
+                </select>
+            </div>
+
+            <div class="row mt-2">
                 <label for="excluded_companies">Excluded Companies</label>
                 <select id="excluded_companies" class="form-control select_field" multiple="multiple">
                     <option value="Google">Google</option>
@@ -159,7 +152,7 @@
             </div>
 
             <div class="row mt-2">
-                <label for="excluded_keywords">Excluded Keywords</label>
+                <label for="excluded_keywords">Excluded Title Keywords</label>
                 <select id="excluded_keywords" class="form-control select_field" multiple="multiple">
                     <option value="Senior">Senior</option>
                     <option value="Lead">Lead</option>
@@ -259,7 +252,7 @@
 
             <div class=" mt-2">
                 <label for="minimum_jobs_per_page">
-                    Minimum Jobs Per Page
+                    Target Minimum Valid Job Postings Per Search Term
                 </label>
                 <input type="number" class="form-control" id="minimum_jobs_per_page" value="1">
             </div>
@@ -271,17 +264,6 @@
         </form>
     </div>
 
-    <script>
-        // TODO: Replace these with actual values from your scraper
-        var isRunning = true;
-        var runningTime = 2; // in hours
-        var hoursUntilNextRun = 22;
-
-        document.getElementById('status').innerHTML += isRunning ? 'Running' : 'Not Running';
-        document.getElementById('runningTime').innerHTML += runningTime + ' hours';
-        document.getElementById('nextRun').innerHTML += hoursUntilNextRun + ' hours';
-        document.getElementById('lastUpdated').innerHTML = new Date().toLocaleString();
-    </script>
     <script>
         $(document).ready(function () {
             $(".select_field").select2({
