@@ -1,327 +1,125 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends 'base.html' %}
+{% block content %}
+    <h2>Customizations</h2>
+    <form method="POST" action="/customizations_restore">
+    <p>
+        Last Updated: {{ last_updated }}
+        <br>
+        Restore Points: {{ restore_points.dropdown }} <input type="submit" value="Restore">
+    </p>
+    </form>
+    <hr>
+    <form method="POST" action="/customizations_set">
+        <h4>Search Terms</h4>
+        {% if customizations_errors['searches'] %}
+            {{ customizations_errors['searches']|safe }}
+        {% endif %}
+        {% for nested in searchTerms.rows %}
+            {{ nested.search_term_label }}
+            <br>
+        {% endfor %}
+        {{ searchTerms.add_row }}
+        <br>
+        <h4>Search Locations</h4>
+        {% if customizations_errors['locations'] %}
+            {{ customizations_errors['locations']|safe }}
+        {% endif %}
+        {% for nested in locations.rows %}
+            {{ nested.location_label }}
+            <br>
+        {% endfor %}
+        <br>
+        <h4>Excluded Locations</h4>
+        {% if customizations_errors['excluded_locations'] %}
+            {{ customizations_errors['excluded_locations']|safe }}
+        {% endif %}
+        {% for nested in excluded_locations.rows %}
+            {{ nested.exclude_location_label }}
+            <br>
+        {% endfor %}
+        <br>
+        <h4>Excluded Companies</h4>
+        {% if customizations_errors['excluded_companies'] %}
+            {{ customizations_errors['excluded_companies']|safe }}
+        {% endif %}
+        {% for nested in excluded_companies.rows %}
+            {{ nested.excluded_org_label }}
+            <br>
+        {% endfor %}
+        <h4>Excluded Title Keywords</h4>
+        {% if customizations_errors['excluded_title_keywords'] %}
+            {{ customizations_errors['excluded_title_keywords']|safe }}
+        {% endif %}
+        {% for nested in excluded_titles.rows %}
+            {{ nested.excluded_titles_label }}
+            <br>
+        {% endfor %}
+        <h4>Excluded Industries</h4>
+        {% if customizations_errors['excluded_industries'] %}
+            {{ customizations_errors['excluded_industries']|safe }}
+        {% endif %}
+        {% for nested in excluded_industries.rows %}
+            {{ nested.excluded_industries_label }}
+            <br>
+        {% endfor %}
+        <h4>Keyword Weights</h4>
+        {% if customizations_errors['word_weights'] %}
+            {{ customizations_errors['word_weights']|safe }}
+        {% endif %}
+        <table>
+            <tbody>
+                {% for nested in keyword_weights.rows %}
+                    {% if (loop.index - 1) % 2 == 0 %}
+                        <tr>
+                        <td>{{ nested.keyword_label }}</td>
+                    {% endif %}
+                    {% if (loop.index - 1) % 2 != 0 %}
+                        <td>{{ nested.weight_label }}</td>
+                        </tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        <h4>Experience Levels</h4>
+        {% if customizations_errors['experience_levels'] %}
+            {{ customizations_errors['experience_levels']|safe }}
+        {% endif %}
+        <table>
+            <tbody>
+                <tr>
+                    <td>Internship</td>
+                    <td> {{ experiences['Internship']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Entry</td>
+                    <td> {{ experiences['Entry level']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Associate</td>
+                    <td> {{ experiences['Associate']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Mid-Senior</td>
+                    <td> {{ experiences['Mid-Senior level']|safe }} </td>
+                </tr>
+                <tr>
+                    <td>Director</td>
+                    <td> {{ experiences['Director']|safe }} </td>
+                </tr>
+            </tbody>
+        </table>
+        <h4>Minimum Jobs Per Search</h4>
+        {% if customizations_errors['minimum_jobs_per_search'] %}
+            {{ customizations_errors['minimum_jobs_per_search']|safe }}
+        {% endif %}
+        {% for nested in minEntries.rows %}
+            {{ nested.min_jobs_label }}
+            <br>
+        {% endfor %}
+        <br>
+    <br>
+    <input type="submit" value="Save">
+    </form>
+    <br>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tag Input Example</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"
-        integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8=" crossorigin="anonymous"></script>
-
-    <!-- fontawesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <style>
-        .select2-container--default.select2-container--focus .select2-selection--multiple {
-            border: 1px solid #ced4da;
-
-        }
-
-        .select2-container--default .select2-selection--multiple {
-            border: 1px solid #ced4da;
-            padding: 0.375rem 5px;
-            font-size: 1rem;
-            border-radius: 0.5rem;
-            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-        }
-
-        .select2-container--default .select2-selection--multiple .select2-selection__choice {
-            background-color: white;
-            border: 1px solid #C1C8D0;
-            border-radius: 50rem;
-            /* padding:0rem; */
-            padding: 3px 8px;
-            font-size: 13px;
-            font-weight: 400;
-        }
-
-        .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
-            border-right: none;
-            position: relative;
-            font-size: 13px;
-            font-weight: 400;
-        }
-
-        .add-keyword-btn {
-            padding: 0.2rem 0.5rem;
-            font-size: 0.875rem;
-        }
-    </style>
-</head>
-
-<body>
-    <!-- navbar -->
-    <nav class="navbar navbar-dark navbar-expand-lg bg-body-tertiary sticky-top" data-bs-theme="dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">The Job Scraper</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
-                aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link" aria-current="page" href="/">Home</a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link active" href="customizations.html">Customisations</a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link" href="applications.html">Applications</a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link" href="statistics.html">Statistics</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- alert -->
-    <div class="alert alert-dark alert-dismissible fade show" role="alert">
-        <i class="fas fa-exclamation-triangle me-2"></i> Demo State Active - The Job Scraper is in read only mode. No
-        changes will be saved. The Job Scraper is under
-        active development <a href="https://github.com/JustOneMoreDog/The-Job-Scraper">here</a>.
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-
-    <!-- scraper status -->
-    <div class="container mt-5">
-        <div class="card">
-            <div class="card-header">
-                <h4 class="card-title">Scraper Status</h4>
-            </div>
-            <div class="card-body">
-                <p class="card-text"><strong>Status:</strong> <span id="status"></span></p>
-                <p class="card-text"><strong>Running Time:</strong> <span id="runningTime"></span></p>
-                <p class="card-text"><strong>Hours Until Next Run:</strong> <span id="nextRun"></span></p>
-            </div>
-            <div class="card-footer text-muted">
-                Last updated: <span id="lastUpdated"></span>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- edit customizations -->
-    <div class="container mt-5">
-        <div class="row">
-            <h2>Edit Customizations</h2>
-        </div>
-
-        <form>
-            <div class="row">
-                <label for="search_terms">Search Terms</label>
-                <select id="search_terms" class="form-control select_field" multiple="multiple">
-                    <option value="Software Engineer">Software Engineer</option>
-                    <option value="Software Developer">Software Developer</option>
-                    <option value="Web Developer">Web Developer</option>
-                    <option value="Front End Developer">Front End Developer</option>
-                </select>
-            </div>
-
-            <div class="row mt-2">
-                <label for="search_locations">Search Locations</label>
-                <select id="search_locations" class="form-control select_field" multiple="multiple">
-                    <option value="London">London</option>
-                    <option value="Manchester">Manchester</option>
-                    <option value="Birmingham">Birmingham</option>
-                    <option value="Leeds">Leeds</option>
-                </select>
-            </div>
-
-            <div class="row mt-2">
-                <label for="excluded_locations">Excluded Locations</label>
-                <select id="excluded_locations" class="form-control select_field" multiple="multiple">
-                    <option value="London">London</option>
-                    <option value="Manchester">Manchester</option>
-                    <option value="Birmingham">Birmingham</option>
-                    <option value="Leeds">Leeds</option>
-                </select>
-            </div>
-
-            <div class="row mt-2">
-                <label for="excluded_companies">Excluded Companies</label>
-                <select id="excluded_companies" class="form-control select_field" multiple="multiple">
-                    <option value="Google">Google</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="Amazon">Amazon</option>
-                    <option value="Microsoft">Microsoft</option>
-                </select>
-            </div>
-
-            <div class="row mt-2">
-                <label for="excluded_keywords">Excluded Keywords</label>
-                <select id="excluded_keywords" class="form-control select_field" multiple="multiple">
-                    <option value="Senior">Senior</option>
-                    <option value="Lead">Lead</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Director">Director</option>
-                </select>
-            </div>
-
-            <!-- Keyword Weights -->
-            <div class="row mt-2">
-                <label for="keyword_weights">Keyword Weights</label>
-                <div class="table-responsive">
-                    <table class="table table-bordered" id="keywordTable">
-                        <thead>
-                            <tr>
-                                <th>Keyword</th>
-                                <th>Weight</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="keyword-row">
-                                <td>
-                                    <input type="text" class="form-control keyword-input" value="JavaScript">
-                                </td>
-                                <td>
-                                    <input type="number" class="form-control" value="1">
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-danger btn-sm remove-keyword">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <button type="button" class="mb-2 btn btn-success add-keyword-btn" id="addKeywordBtn">
-                        <i class="fas fa-plus"></i> Add Keyword
-                    </button>
-                </div>
-            </div>
-
-            <!-- Experience Levels -->
-            <div class="row mt-2">
-                <label for="experience_levels" class="col-sm-2 col-form-label">Experience Levels</label>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="internship" id="internship">
-                            <label class="form-check-label" for="internship">
-                                Internship
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="entry" id="entry">
-                            <label class="form-check-label" for="entry">
-                                Entry
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="associate" id="associate">
-                            <label class="form-check-label" for="associate">
-                                Associate
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="midsenior" id="midsenior">
-                            <label class="form-check-label" for="midsenior">
-                                Mid Senior
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="director" id="director">
-                            <label class="form-check-label" for="director">
-                                Director
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class=" mt-2">
-                <label for="minimum_jobs_per_page">
-                    Minimum Jobs Per Page
-                </label>
-                <input type="number" class="form-control" id="minimum_jobs_per_page" value="1">
-            </div>
-
-            <!-- Save Button -->
-            <div class="row mt-2 mb-2 container justify-content-end">
-                <button type="submit" class="btn btn-dark col-2">Save</button>
-            </div>
-        </form>
-    </div>
-
-    <script>
-        // TODO: Replace these with actual values from your scraper
-        var isRunning = true;
-        var runningTime = 2; // in hours
-        var hoursUntilNextRun = 22;
-
-        document.getElementById('status').innerHTML += isRunning ? 'Running' : 'Not Running';
-        document.getElementById('runningTime').innerHTML += runningTime + ' hours';
-        document.getElementById('nextRun').innerHTML += hoursUntilNextRun + ' hours';
-        document.getElementById('lastUpdated').innerHTML = new Date().toLocaleString();
-    </script>
-    <script>
-        $(document).ready(function () {
-            $(".select_field").select2({
-                tags: true,
-                tokenSeparators: [',', ' ']
-            })
-
-            // Add keyword row
-            $('#addKeywordBtn').on('click', function () {
-                var newRow = $('#keywordTable tbody .keyword-row:first').clone();
-                newRow.find('input[type="text"]').val('');
-                newRow.find('input[type="number"]').val('1');
-                newRow.find('.remove-keyword').on('click', function () {
-                    $(this).closest('.keyword-row').remove();
-                });
-                $('#keywordTable tbody').append(newRow);
-            });
-
-            // Remove keyword row or clear input fields if it's the last row
-            function removeKeywordRow(button) {
-                var row = $(button).closest('.keyword-row');
-                var rowCount = $('#keywordTable tbody .keyword-row').length;
-
-                if (rowCount > 1) {
-                    row.remove();
-                } else {
-                    row.find('input').val('');
-                }
-            }
-
-            // Remove keyword row
-            $('#keywordTable').on('click', '.remove-keyword', function () {
-                removeKeywordRow(this);
-            });
-        });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
-        crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-</body>
-
-</html>
+{% endblock %}

@@ -20,6 +20,7 @@ from time import sleep
 from selenium.webdriver.common.keys import Keys
 import random
 from tabulate import tabulate
+import sqlite3
 
 # Global configuration for our exponential backoff
 debug = False
