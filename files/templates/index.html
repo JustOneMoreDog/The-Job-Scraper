@@ -1,58 +1,11 @@
 {% extends 'base.html' %}
 {% block extrastyle %}
-{#    table { width: 100%; }#}
-{#    table, th, td { border: 1px solid black; }#}
+    table { width: 100%; }
+    table, th, td { border: 1px solid black; }
 {% endblock %}
 {% block content %}
-    <div class="container mt-5">
-        <div class="d-flex mb-3">
-            <div class="row g-3 align-items-center">
-                <div class="col-auto">
-                    <label for="selectOption" class="form-label">Select Posting Date:</label>
-                </div>
-                <div class="col-auto">
-                    <form method="POST" action="/display_jobs_set">
-                        {{ job_scrapes.dropdown }}<input type="submit" value="Display">
-                    </form>
-                </div>
-            </div>
-        </div>
-        {% include job_table_choice %}
-    </div>
-
-    <script>
-        $(document).ready(function () {
-            $('#job_table thead th').css({
-                'background-color': '#343a40',
-                'color': '#fff'
-            })
-            $('#job_table').DataTable({
-                language: {
-                    search: "_INPUT_",
-                    searchPlaceholder: "Search..."
-                },
-                dom: "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'>><'row'<'col-sm-12'tr>><'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-                pagingType: 'numbers',
-                select: {
-                    style: 'os',
-                    selector: 'td:first-child'
-                },
-                columnDefs: [
-                    {
-                        targets: 0,
-                        searchable: false,
-                        orderable: false,
-                        className: 'select-checkbox',
-                        render: function (data, type, full, meta) {
-                            return '<input type="checkbox">';
-                        }
-                    }
-                ],
-                order: [[1, 'asc']]
-            });
-        });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
-        crossorigin="anonymous"></script>
+    <form method="POST" action="/display_jobs_set">
+        Discovered Job Postings: {{ job_scrapes.dropdown }} <input type="submit" value="Display">
+    </form><br><br>
+    {% include job_table_choice %}
 {% endblock %}

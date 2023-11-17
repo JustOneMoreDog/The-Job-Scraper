@@ -23,9 +23,9 @@ RUN useradd -m -s /bin/bash hunter && \
 USER hunter
 WORKDIR /home/hunter
 RUN git clone -b refactor https://github.com/JustOneMoreDog/The-Job-Scraper.git && \
-    cp LinkedIn-Job-Scraper/files/customizations_default.yaml LinkedIn-Job-Scraper/files/customizations.yaml
+    cp The-Job-Scraper/files/customizations_default.yaml The-Job-Scraper/files/customizations.yaml
 USER root
-RUN ln -s /home/hunter/LinkedIn-Job-Scraper/files /app && \
+RUN ln -s /home/hunter/The-Job-Scraper/files /app && \
     chown -R hunter:hunter /app
 USER hunter
 WORKDIR /app
