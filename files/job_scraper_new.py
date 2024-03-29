@@ -534,7 +534,7 @@ class TheJobScraper:
         options.headless = self.app_config['headless']
         # Statically defining the window size to ensure consistency and that elements always show up
         options.add_argument(f"--window-size={self.app_config['window_size']}")
-        return uc.Chrome(executable_path=self.app_config['chrome_driver_executable_path'], options=options)
+        return uc.Chrome(executable_path=self.customizations['chrome_driver_executable_path'], options=options)
 
 
 class JobPosting:
