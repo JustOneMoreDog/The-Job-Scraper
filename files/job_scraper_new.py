@@ -291,6 +291,9 @@ class TheJobScraper:
         remote_button.click()
         remote_checkbox = self.get_web_element(By.XPATH, self.app_config['remote_checkbox'])
         remote_checkbox.click()
+        if self.customizations['include_hybrid_jobs']:
+            hybrid_checkbox = self.get_web_element(By.XPATH, self.app_config['hybrid_checkbox'])
+            hybrid_checkbox.click()
         self.find_and_press_done_button()
         self.load_url()
 
