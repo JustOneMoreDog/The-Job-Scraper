@@ -429,10 +429,10 @@ class TheJobScraper:
             self.driver.get(url)
         # Stolen code that performs a bunch of checks to verify the page has loaded
         self.wait_for_page_to_load()
-        # Next we have to check to make sure that we have not been redirected
-        self.check_for_redirect()
         # Lastly we will need to check to make sure we have not been hit with a 429
         self.check_for_http_too_many_requests()
+        # Next we have to check to make sure that we have not been redirected
+        self.check_for_redirect()
         # Then we sprinkle in some random sleep to pretend we are human (we are not)
         sleep(random.uniform(minimum_jitter, maximum_jitter))
 
@@ -473,6 +473,9 @@ class TheJobScraper:
         http_429_check = self.driver.find_elements(By.XPATH, self.app_config['http_429_xpath'])
         if http_429_check:
             raise TooManyRequestsException("We have been hit with HTTP 429 and so we need to sleep")
+        network_down_message = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Your LinkedIn Network Will Be Back Soon')]")
+        if network_down_message:
+            raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def init_logging(self) -> None:
         scraper_logs_directory = os.path.join(self.working_directory, "scraper_logs")
