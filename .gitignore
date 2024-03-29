@@ -1,6 +1,9 @@
 # Excluding PyCharm Stuff
 /.idea
-/venv
+/virtualenv
+!/virtualenv/.keep
+/chromedriver
+!/chromedriver/.keep
 # Ignore any cache files
 /files/__pycache__
 /files/scraper_utils/__pycache__
