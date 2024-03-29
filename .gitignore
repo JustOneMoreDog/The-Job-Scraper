@@ -32,3 +32,4 @@ files/scraper_logs/*
 !/files/templates/applications.html
 /files/customizations.yaml
 *.log
+files/error*.png
