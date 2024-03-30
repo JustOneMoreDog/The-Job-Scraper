@@ -1,38 +1,46 @@
 import logging
 import logging.handlers
 import os
-import psutil
 import re
 import subprocess
 import time
-import yaml
-
-from apscheduler.executors.pool import ThreadPoolExecutor, ProcessPoolExecutor
-from apscheduler.schedulers.background import BackgroundScheduler
 from collections import namedtuple
 from datetime import datetime, timedelta
-from flask import Flask, render_template, redirect, url_for, request
+
+import psutil
+import yaml
+from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
+from apscheduler.schedulers.background import BackgroundScheduler
+from flask import Flask, redirect, render_template, request, url_for
 from flask_caching import Cache
 from flask_wtf import FlaskForm
-from forms import SearchTermsForm, MinJobsForm, LocationsForm, ExcludedIndustries, ExcludedLocationsForm, \
-    ExcludedCompanies, WordWeightForm, SubmitButton, ExcludedTitles
 from wtforms import SelectField
-import platform
-import os
 
+from forms import (
+    ExcludedCompanies,
+    ExcludedIndustries,
+    ExcludedLocationsForm,
+    ExcludedTitles,
+    LocationsForm,
+    MinJobsForm,
+    SearchTermsForm,
+    SubmitButton,
+    WordWeightForm,
+)
 
 app_config = {
     "SECRET_KEY": "wearenotreallykeepingsecretssowhatever",
     "CACHE_TYPE": "SimpleCache",
     "CACHE_DEFAULT_TIMEOUT": 0,
-    "CACHE_DIR": "/app/cache/"
+    "CACHE_DIR": os.path.abspath(os.path.join(__file__, "cache"))
 }
 app = Flask(__name__)
 app.config.from_mapping(app_config)
 cache = Cache(app)
-working_directory = "/app"
-customizations_path = os.path.join(working_directory, "customizations.yaml")
-customizations_backup_path = os.path.join(working_directory, "customizations_backups")
+customizations_path = os.path.abspath(os.path.join(__file__, "customizations.yaml"))
+customizations_backup_path = os.path.abspath(os.path.join(__file__, "customizations_backups"))
+templates_directory = os.path.abspath(os.path.join(__file__, 'templates'))
+flask_logs = os.path.abspath(os.path.join(__file__, 'flask_logs'))
 
 
 def init_logging() -> None:
@@ -63,10 +71,11 @@ def load_customizations(path) -> None:
 
 def get_job_scrapes() -> list:
     job_data_list = []
-    templates_directory = os.path.join(working_directory, 'templates')
-    for x in os.listdir(templates_directory):
-        if os.path.isdir(os.path.join('/app/templates', x)) and x != 'Welcome Page':
-            job_data_list.append(x)
+    for dir in os.listdir(templates_directory):
+        is_a_directory = os.path.isdir(os.path.join(templates_directory, dir))
+        not_welcome_page = dir != 'Welcome Page'
+        if is_a_directory and not_welcome_page:
+            job_data_list.append(dir)
     job_data_list.sort(reverse=True)
     job_data_list.append('Welcome Page')
     return job_data_list
@@ -112,9 +121,13 @@ schedule = BackgroundScheduler(timezone='America/New_York', executors=executors)
 
 
 def check_scraper() -> dict:
-    is_running = [proc.cmdline() for proc in psutil.process_iter()
-                  if '/usr/bin/python3' in proc.cmdline() and '/app/job_scraper.py' in proc.cmdline()
-                  ]
+    is_running = False
+    for proc in psutil.process_iter():
+        is_python = '/usr/bin/python3' in proc.cmdline()
+        is_job_scraper = 'job_scraper.py' in proc.cmdline()
+        if is_python and is_job_scraper:
+            is_running = True
+            break
     if datetime.today().hour > 5:
         hours_until = 24 - datetime.today().hour + 5
     elif datetime.today().hour < 5:
@@ -123,9 +136,9 @@ def check_scraper() -> dict:
         hours_until = 0
     if is_running:
         logging.info("Job Scraper is currently running")
-        x = os.listdir("/app/flask_logs/")
-        x.sort()
-        runtime = str(timedelta(seconds=(int(time.time()) - int(x[-1].split(".")[0]))))
+        log_files = os.listdir(flask_logs)
+        log_files.sort(reverse=True)
+        runtime = str(timedelta(seconds=(int(time.time()) - int(log_files[0].split(".")[0]))))
         return {
             'status': "Running",
             'runtime': runtime,
@@ -413,7 +426,9 @@ def process_customizations(r):
 
 
 def run_job_scraper():
-    subprocess.run(['/home/sandwich/The-Job-Scraper/virtualenv/bin/python3', '/app/job_scraper_new.py'])
+    virtual_env_path = os.path.abspath(os.path.join(__file__, 'virtualenv/bin/python'))
+    job_scraper_path = os.path.abspath(os.path.join(__file__, 'job_scraper.py'))
+    subprocess.run([virtual_env_path, job_scraper_path])
 
 
 if not schedule.running:

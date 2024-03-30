@@ -1,33 +1,41 @@
-from bs4 import BeautifulSoup
-from selenium.common import ElementNotInteractableException, InvalidSessionIdException, NoSuchElementException, \
-    StaleElementReferenceException
-from selenium.webdriver.remote.webdriver import WebElement
-import platform
-import os
+import json
 import logging
 import logging.handlers
-from datetime import datetime, timedelta
-import yaml
-import json
-import undetected_chromedriver as uc
-from undetected_chromedriver import Chrome, ChromeOptions
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter, wait_fixed
-from scraper_utils import js_conditions
-from urllib.parse import parse_qs, urlparse
-from selenium.webdriver.common.by import By
-import time
-from time import sleep
-from selenium.webdriver.common.keys import Keys
+import os
 import random
+import time
+from datetime import datetime
+from time import sleep
+from urllib.parse import parse_qs, urlparse
+
+import undetected_chromedriver as uc
+import yaml
+from bs4 import BeautifulSoup
+from scraper_utils import js_conditions
+from selenium.common import (
+    ElementNotInteractableException,
+    NoSuchElementException,
+    StaleElementReferenceException,
+)
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.remote.webdriver import WebElement
 from tabulate import tabulate
-import sqlite3
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    wait_fixed,
+)
+from undetected_chromedriver import Chrome, ChromeOptions
 
 # Global configuration for our exponential backoff
 debug = False
 minimum_jitter = 2
-maximum_jitter = 5
+maximum_jitter = 10
 exponential_jitter_wait = wait_exponential_jitter(5, 1200, 5, random.uniform(minimum_jitter, maximum_jitter))
-retry_attempts = stop_after_attempt(5)
+retry_attempts = stop_after_attempt(10)
 
 
 class RedirectedException(Exception):
@@ -45,9 +53,8 @@ class ElementNotFoundException(Exception):
 class TheJobScraper:
 
     def __init__(self):
-        self.working_directory = "/app" # 'C:/Users/Name/Documents/GitHub/The-Job-Scraper/files/'
-        os.chdir(self.working_directory)
         self.original_url = ""
+        self.current_date = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         self.init_logging()
         self.app_config, self.customizations = self.initialize_config_files()
         self.all_jobs = self.initialize_data_files()
@@ -64,7 +71,7 @@ class TheJobScraper:
         # is set by the customizations['minimum_good_results_per_search_per_location']
         # This helps lower the amount of work that needs to happen
         self.new_good_job_scrapes_for_search = 0
-        self.log(f"Successfully initialized the job scraper")
+        self.log("Successfully initialized the job scraper")
         self.log(f"\n-----\nApplication Configuration:\n{self.app_config}\n-----")
         self.log(f"\n-----\nSearch Customizations:\n{self.customizations}\n-----")
 
@@ -78,13 +85,21 @@ class TheJobScraper:
         self.log("Finished job scraping and starting the post processing")
         self.organize_and_sort_new_job_postings()
         self.log(f"Good {len(self.good_jobs)}, Bad {len(self.bad_jobs)}, Total {len(self.new_job_scrapes)}")
+        self.log("Saving new job scrapes into their new destination")
+        self.save_new_job_scrapes()
         self.log("Finished post processing saving results")
         self.save_job_scrape(self.good_jobs + self.bad_jobs, "all_jobs.json")
         self.log("Creating HTML output")
         self.create_html_output()
 
+    def save_new_job_scrapes(self) -> None:
+        self.add_blank_spaces_to_good_jobs()
+        new_job_scrapes_filename = self.current_date + ".json"
+        new_job_scrapes_path = os.path.abspath(os.path.join(__file__, "job_scrapes", new_job_scrapes_filename))
+        self.save_job_scrape(self.good_jobs + self.bad_jobs, new_job_scrapes_path)
+
     def organize_and_sort_new_job_postings(self) -> None:
-        self.log("Organizing job postings as either good or bad")
+        self.log("Organizing new job postings as either good or bad")
         for job_posting in self.new_job_scrapes:
             if job_posting['rating'] > 0:
                 self.good_jobs.append(job_posting)
@@ -95,13 +110,11 @@ class TheJobScraper:
         self.bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
 
     def add_blank_spaces_to_good_jobs(self) -> None:
-        blank_job = {"posted_time": "", "location": "", "title": "", "company": "", "industry": "",
-                     "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
+        blank_job = {"applied": False, "posted_time": "", "location": "", "title": "", "company": "", "industry": "", "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
         for _ in range(0, 4):
             self.good_jobs.append(blank_job)
         self.good_jobs.append({
-            "posted_time": "Excluded Jobs", "location": "", "title": "", "company": "", "industry": "", "rating": "",
-            "keywords": "Note: LOCation, COMPany, TITLE", "search": "", "url": "", "content": ""
+            "applied": False, "posted_time": "Excluded Jobs", "location": "", "title": "", "company": "", "industry": "", "rating": "", "keywords": "Note: LOCation, COMPany, TITLE", "search": "", "url": "", "content": ""
         })
 
     def create_html_output(self) -> None:
@@ -118,7 +131,7 @@ class TheJobScraper:
             f.write(str(html_job_posting_table.prettify()))
 
     def create_html_directory(self) -> None:
-        templates_folder = self.app_config['html_folder']
+        templates_folder = os.path.abspath(os.path.join(__file__, self.app_config['html_folder']))
         this_scrapes_folder = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         this_scrapes_folder_path = os.path.join(templates_folder, this_scrapes_folder)
         if not os.path.exists(this_scrapes_folder_path):
@@ -208,26 +221,29 @@ class TheJobScraper:
             self.log(f"Filtering by timespan '{timespan}'")
             self.filter_results_timespan(timespan_button_path)
         if self.there_are_still_results():
-            self.log(f"Filtering to full time positions")
+            self.log("Filtering to full time positions")
             self.select_only_full_time_positions()
         if self.there_are_still_results():
-            self.log(f"Further filter down by selecting remote jobs because RTO is cringe")
+            if self.customizations['include_hybrid_jobs']:
+                self.log("Including hybrid and remote jobs")
+            else:
+                self.log("Including only remote jobs because RTO is cringe")
             try:
                 self.select_only_remote_jobs()
             except NoSuchElementException:
                 self.log("We could not find any remote jobs")
                 return
         if self.there_are_still_results():
-            self.log(f"Selecting experience levels")
+            self.log("Selecting experience levels")
             self.select_experience_levels()
         if self.there_are_still_results():
-            self.log(f"Getting all job postings that are displayed on the page")
+            self.log("Getting all job postings that are displayed on the page")
             self.get_all_job_postings()
 
     def there_are_still_results(self) -> bool:
         try:
-            search_yielded_no_results = self.get_web_element(By.CLASS_NAME, self.app_config['no_results'])
-            self.log(f"There are now no results being displayed")
+            _ = self.get_web_element(By.CLASS_NAME, self.app_config['no_results'])
+            self.log("There are now no results being displayed")
             return False
         except NoSuchElementException:
             return True
@@ -299,7 +315,9 @@ class TheJobScraper:
 
     def select_experience_levels(self) -> None:
         filters_section = self.get_web_element(By.XPATH, self.app_config['filters_section'])
-        experience_level_button = self.get_web_element(By.XPATH, self.app_config['exp_level_button'], filters_section)
+        experience_level_button = self.get_web_element(By.XPATH, self.app_config['exp_level_button'], filters_section, False)
+        if not experience_level_button:
+            return
         experience_level_button.click()
         experience_levels = self.customizations['experience_levels']
         target_experience_levels = [y for y in experience_levels.keys() if experience_levels[y]]
@@ -315,15 +333,15 @@ class TheJobScraper:
             self.find_and_press_done_button()
             self.load_url()
             return
-        self.log(f"Could not find target experience levels checking if it was an error")
+        self.log("Could not find target experience levels checking if it was an error")
         for experience_level in experience_levels.keys():
             try:
-                x = self.get_web_element(By.XPATH, f"//label[contains(text(), '{experience_level}')]")
-                self.log(f"Not an error we are fine")
+                _ = self.get_web_element(By.XPATH, f"//label[contains(text(), '{experience_level}')]")
+                self.log("Not an error we are fine")
                 return
             except NoSuchElementException:
                 continue
-        raise ElementNotFoundException(f"Could not find any experience level checkboxes")
+        raise ElementNotFoundException("Could not find any experience level checkboxes")
 
     def get_all_job_postings(self) -> None:
         previous_index = 0
@@ -354,7 +372,7 @@ class TheJobScraper:
                     more_jobs_button.click()
                     return True
                 except (NoSuchElementException, ElementNotInteractableException):
-                    self.log(f"At the bottom and do not see the more jobs button")
+                    self.log("At the bottom and do not see the more jobs button")
                     return False
         return True
 
@@ -362,7 +380,7 @@ class TheJobScraper:
         all_job_postings_section = self.get_web_element(By.XPATH, self.app_config['job_results_list'])
         all_job_postings = all_job_postings_section.find_elements(By.TAG_NAME, "li")
         if not all_job_postings:
-            raise ElementNotFoundException(f"Did not find any entries in job results list section")
+            raise ElementNotFoundException("Did not find any entries in job results list section")
         return all_job_postings
 
     def get_all_job_posting_objects(self, starting_index: int) -> None:
@@ -395,7 +413,7 @@ class TheJobScraper:
             self.new_job_scrapes.append(job_posting_object_json)
             self.new_good_job_scrapes_for_search += 1
             valid_jobs += 1
-        self.log(f"Finished getting the job posting data for this batch")
+        self.log("Finished getting the job posting data for this batch")
         self.log(f"Duplicates: {duplicates}, Exclusions: {excluded_jobs}, Valid: {valid_jobs}")
 
     def find_and_press_done_button(self) -> None:
@@ -413,7 +431,7 @@ class TheJobScraper:
             raise ElementNotFoundException("Could not find the correct done button")
         done_button.click()
 
-    def get_web_element(self, by: By, search_filter: str, element: WebElement = None) -> WebElement:
+    def get_web_element(self, by: By, search_filter: str, element: WebElement = None, is_fatal: bool = True) -> WebElement:
         try:
             if element:
                 desired_web_element = element.find_element(by, search_filter)
@@ -422,6 +440,8 @@ class TheJobScraper:
             return desired_web_element
         except NoSuchElementException as e:
             self.log(f"Could not find the '{search_filter}' web element via '{by}'")
+            if not is_fatal:
+                return None
             raise e
 
     def load_url(self, url=None) -> None:
@@ -478,8 +498,8 @@ class TheJobScraper:
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def init_logging(self) -> None:
-        scraper_logs_directory = os.path.join(self.working_directory, "scraper_logs")
-        scraper_backup_directory = os.path.join(self.working_directory, "scrape_backups")
+        scraper_logs_directory = os.path.abspath(os.path.join(__file__, "scraper_logs"))
+        scraper_backup_directory = os.path.abspath(os.path.join(__file__, "scrape_backups"))
         if not os.path.exists(scraper_logs_directory):
             os.mkdir(scraper_logs_directory)
         if not os.path.exists(scraper_backup_directory):
@@ -487,10 +507,10 @@ class TheJobScraper:
         if debug:
             log_filename = "ide_debug_logs.log"
             # Clears the file
-            with open(os.path.join(scraper_logs_directory, log_filename), 'w') as f:
+            with open(os.path.join(scraper_logs_directory, log_filename), 'w') as _:
                 pass
         else:
-            log_filename = datetime.now().strftime("%m_%d_%Y_%H_%M_%S") + ".log"
+            log_filename = self.current_date + ".log"
         log_filepath = os.path.join(scraper_logs_directory, log_filename)
         logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="w")
         logging.info("Logging has been setup for job scraper")
@@ -505,7 +525,7 @@ class TheJobScraper:
             return json.load(f)
 
     @staticmethod
-    def initialize_config_files() -> (dict, dict):
+    def initialize_config_files() -> tuple[dict, dict]:
         if not os.path.exists("config.yaml"):
             logging.error("Config file is missing")
             exit(-1)
@@ -518,12 +538,12 @@ class TheJobScraper:
             customizations = yaml.load(f, Loader=yaml.FullLoader)
         return app_config, customizations
 
-    def initialize_data_files(self) -> []:
+    def initialize_data_files(self) -> list:
         # Makes sure that our JSON and HTML data files are created and ready for use
         all_jobs_path = self.app_config['jobs_filepath']
         if not os.path.exists(all_jobs_path):
             self.save_job_scrape([], all_jobs_path)
-        html_path = self.app_config['html_folder']
+        html_path = os.path.abspath(os.path.join(__file__, self.app_config['html_folder']))
         if not os.path.exists(html_path):
             os.mkdir(html_path)
         all_jobs = self.load_json_data() or []
@@ -533,11 +553,13 @@ class TheJobScraper:
 
     def initialize_chrome_driver(self) -> Chrome:
         options = ChromeOptions()
-        logging.info(f"Setting chrome driver to have headless be {self.app_config['headless']}")
+        logging.info(f"Setting chrome driver to have headless be '{self.app_config['headless']}'")
         options.headless = self.app_config['headless']
         # Statically defining the window size to ensure consistency and that elements always show up
         options.add_argument(f"--window-size={self.app_config['window_size']}")
-        return uc.Chrome(executable_path=self.customizations['chrome_driver_executable_path'], options=options)
+        chrome_driver_executable_path = os.path.abspath(os.path.join(__file__, self.customizations['chrome_driver_executable_path']))
+        logging.info(f"Chrome driver executable path is '{chrome_driver_executable_path}'")
+        return uc.Chrome(executable_path=chrome_driver_executable_path, options=options)
 
 
 class JobPosting:
@@ -570,6 +592,7 @@ class JobPosting:
 
     def get_job_posting_json_data(self) -> dict:
         return {
+            "Applied": False,
             "posted_time": self.posted_time,
             "title": self.title,
             "company": self.company,
@@ -758,36 +781,18 @@ class JobPosting:
 if __name__ == '__main__':
     scraper = TheJobScraper
     try:
-        # total = []
-        # for i in range(0, 10):
-        #     start = int(time.time())
-        #     scraper = TheJobScraper()
-        #     scraper.scrape_jobs_from_linkedin()
-        #     finish = int(time.time())
-        #     run_time = finish - start
-        #     total.append(run_time)
-        #     formatted_run_time = str(timedelta(seconds=run_time))
-        #     print(f"The job scraper has finished iteration {i} all tasks with a runtime of {formatted_run_time}")
-        # total_time = 0
-        # print("RUNTIMES")
-        # for run_time in total:
-        #     formatted_run_time = str(timedelta(seconds=run_time))
-        #     print(formatted_run_time)
-        #     total_time += run_time
-        # print("AVERAGE")
-        # average = total_time / 10
-        # formatted_run_time = str(timedelta(seconds=int(average)))
-        # print(formatted_run_time)
         scraper = TheJobScraper()
         scraper.scrape_jobs_from_linkedin()
         scraper.driver.close()
     except Exception as e:
-        screenshot = f"error_{str(int(time.time()))}.png"
-        scraper.driver.save_screenshot(screenshot)
-        logging.info(f"Saving screenshot of the session at {screenshot}")
-        logging.exception("RAN INTO A NEW ERROR THAT WE HAVE NOT SEEN BEFORE")
+        screenshot_name = f"error_{str(int(time.time()))}.png"
+        screenshot_path = os.path.abspath(os.path.join(__file__, "scraper_logs/screenshots", screenshot_name))
+        scraper.driver.save_screenshot(screenshot_path)
+        logging.info("!!! RAN INTO A NEW ERROR THAT WE HAVE NOT SEEN BEFORE !!!")
+        logging.info(f"Saving screenshot of the session at {screenshot_path}")
+        raise e
     finally:
         try:
             scraper.driver.close()
-        except:
+        except Exception:
             pass

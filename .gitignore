@@ -1,35 +1,38 @@
 # Excluding PyCharm Stuff
 /.idea
-/virtualenv
+# Making sure not to commit our venv
+/virtualenv/*
 !/virtualenv/.keep
-/chromedriver
+# Ignoring the chromedriver
+/chromedriver/*
 !/chromedriver/.keep
 # Ignore any cache files
-/files/__pycache__
-/files/scraper_utils/__pycache__
-files/cache/*
-!files/cache/.keep
+/__pycache__
+/scraper_utils/__pycache__
+/cache/*
+/cache/.keep
 # Ignore all the files created by the job scraper
-files/customizations_backups/*
-!files/customizations_backups/.keep
-files/scrape_backups/*
-!files/scrape_backups/.keep
-/files/all_jobs.json
-/files/all_jobs.json.old
+/customizations_backups/*
+!/customizations_backups/.keep
+/scrape_backups/*
+!/scrape_backups/.keep
+/all_jobs.json
+/all_jobs.json.old
 # Ignore the logs made by the job scraper and flask
-files/flask_logs/*
-!files/flask_logs/.keep
-files/scraper_logs/*
-!files/scraper_logs/.keep
+/flask_logs/*
+!/flask_logs/.keep
+/scraper_logs/*
+!/scraper_logs/.keep
 # Ignoring all stuff added to templates by the job scraper
-/files/templates/*
+/templates/*
 # Except for the default templates used for the web gui
-!/files/templates/Welcome Page/
-!/files/templates/base.html
-!/files/templates/customizations.html
-!/files/templates/index.html
-!/files/templates/statistics.html
-!/files/templates/applications.html
-/files/customizations.yaml
-*.log
-files/error*.png
+!/templates/Welcome Page/
+!/templates/base.html
+!/templates/customizations.html
+!/templates/index.html
+!/templates/statistics.html
+!/templates/applications.html
+/customizations.yaml
+# Ignoring job scrape json files
+/job_scrapes/*
+!/job_scrapes/.keep
