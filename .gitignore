@@ -34,5 +34,5 @@
 !/templates/applications.html
 /customizations.yaml
 # Ignoring job scrape json files
-/job_scrapes/*
-!/job_scrapes/.keep
+/.job_scrapes/*
+!/.job_scrapes/.keep

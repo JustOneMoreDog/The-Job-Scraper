@@ -34,7 +34,7 @@ def get_scraper_status():
 
 def get_job_scrape_dates() -> list:
     # Find dates from job scrape files
-    job_scrape_dir = 'job_scrapes'
+    job_scrape_dir = '.job_scrapes'
     all_scrape_dates = []
     for filename in os.listdir(job_scrape_dir):
         if not filename.endswith('.json'):
