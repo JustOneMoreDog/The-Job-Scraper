@@ -5,7 +5,7 @@ import psutil
 import datetime
 
 DEMO_STATE = True
-app = Flask(__name__)
+app = Flask(__name__, template_folder='new_templates')
 
 ### HELPER FUNCTIONS ###
 
@@ -29,7 +29,7 @@ def get_scraper_status():
     if next_run_time < datetime.datetime.now():
          next_run_time += datetime.timedelta(days=1)
     hours_until_next_run = (next_run_time - datetime.datetime.now()).seconds // 3600
-
+    print(f"is_running: {is_running}, running_time: {running_time}, hours_until_next_run: {hours_until_next_run}")
     return is_running, running_time, hours_until_next_run
 
 def get_job_scrape_dates() -> list:
@@ -69,17 +69,15 @@ def get_job_data():
     if not request.method == 'POST':
         return jsonify({'error': 'Invalid request method'})
     
-    selected_date = request.form['date']  # Get the date from the AJAX request
-    # Construct the path to the JSON file
+    selected_date = request.form['date']
     job_scrape_dir = 'job_scrapes'
-    file_date_str = selected_date.replace('-', '_')  # Match the filename format
+    file_date_str = selected_date.replace('-', '_')
     json_filename = f'{file_date_str}.json'
     json_filepath = os.path.join(job_scrape_dir, json_filename)
-    # Load and return data 
     try:
         with open(json_filepath, 'r') as f:
             data = json.load(f)
-            return jsonify(data)  # Use jsonify to return proper JSON response
+            return jsonify(data)
 
     except FileNotFoundError:
         return jsonify({'error': 'Data for the selected date not found.'})
@@ -87,4 +85,4 @@ def get_job_data():
 
 
 if __name__ == '__main__':
-    app.run(host="127.0.0.1", port=8080)
+    app.run(host="127.0.0.1", port=9090)

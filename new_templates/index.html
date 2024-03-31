@@ -99,8 +99,7 @@
     <h4 class="card-title">Scraper Status</h4>
    </div>
    <div class="card-body">
-    <p class="card-text"><strong>Status:</strong> <span id="status">{{ is_running ? 'Running' : 'Idle'
-                            }}</span></p>
+    <p class="card-text"><strong>Status:</strong> <span id="status">{{ 'Running' if is_running else 'Idle'}}</span></p>
     {% if running_time %}
     <p class="card-text"><strong>Running Time:</strong> <span id="runningTime">{{ running_time }}</span></p>
     {% endif %}
@@ -195,7 +194,7 @@
               var selectedDate = $(this).val(); 
   
               $.ajax({
-                  url: '/get_job_data',  // Placeholder - You'll need a Flask route for this
+                  url: '/get_job_data',  
                   data: { date: selectedDate },
                   success: function(data) {
                       // Update the job_table with the received data
@@ -236,17 +235,6 @@
           order: [[6, 'desc']]
       });
   });
- </script>
-
- <script>
-  // TODO: Replace these with actual values from your scraper
-  var isRunning = true;
-  var runningTime = 2; // in hours
-  var hoursUntilNextRun = 22;
-  
-  document.getElementById('status').innerHTML += isRunning ? 'Running' : 'Not Running';
-  document.getElementById('runningTime').innerHTML += runningTime + ' hours';
-  document.getElementById('nextRun').innerHTML += hoursUntilNextRun + ' hours';
  </script>
  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
