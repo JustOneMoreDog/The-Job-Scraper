@@ -53,6 +53,7 @@ class ElementNotFoundException(Exception):
 class TheJobScraper:
 
     def __init__(self):
+        self.current_working_directory = os.path.dirname(os.path.abspath(__file__))
         self.original_url = ""
         self.current_date = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
         self.init_logging()
@@ -95,7 +96,7 @@ class TheJobScraper:
     def save_new_job_scrapes(self) -> None:
         self.add_blank_spaces_to_good_jobs()
         new_job_scrapes_filename = self.current_date + ".json"
-        new_job_scrapes_path = os.path.abspath(os.path.join(__file__, "job_scrapes", new_job_scrapes_filename))
+        new_job_scrapes_path = os.path.abspath(os.path.join(self.current_working_directory, ".job_scrapes", new_job_scrapes_filename))
         self.save_job_scrape(self.good_jobs + self.bad_jobs, new_job_scrapes_path)
 
     def organize_and_sort_new_job_postings(self) -> None:
@@ -131,7 +132,7 @@ class TheJobScraper:
             f.write(str(html_job_posting_table.prettify()))
 
     def create_html_directory(self) -> None:
-        templates_folder = os.path.abspath(os.path.join(__file__, self.app_config['html_folder']))
+        templates_folder = os.path.abspath(os.path.join(self.current_working_directory, self.app_config['html_folder']))
         this_scrapes_folder = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
         this_scrapes_folder_path = os.path.join(templates_folder, this_scrapes_folder)
         if not os.path.exists(this_scrapes_folder_path):
@@ -498,8 +499,8 @@ class TheJobScraper:
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def init_logging(self) -> None:
-        scraper_logs_directory = os.path.abspath(os.path.join(__file__, "scraper_logs"))
-        scraper_backup_directory = os.path.abspath(os.path.join(__file__, "scrape_backups"))
+        scraper_logs_directory = os.path.abspath(os.path.join(self.current_working_directory, "scraper_logs"))
+        scraper_backup_directory = os.path.abspath(os.path.join(self.current_working_directory, "scrape_backups"))
         if not os.path.exists(scraper_logs_directory):
             os.mkdir(scraper_logs_directory)
         if not os.path.exists(scraper_backup_directory):
@@ -543,7 +544,7 @@ class TheJobScraper:
         all_jobs_path = self.app_config['jobs_filepath']
         if not os.path.exists(all_jobs_path):
             self.save_job_scrape([], all_jobs_path)
-        html_path = os.path.abspath(os.path.join(__file__, self.app_config['html_folder']))
+        html_path = os.path.abspath(os.path.join(self.current_working_directory, self.app_config['html_folder']))
         if not os.path.exists(html_path):
             os.mkdir(html_path)
         all_jobs = self.load_json_data() or []
@@ -557,7 +558,7 @@ class TheJobScraper:
         options.headless = self.app_config['headless']
         # Statically defining the window size to ensure consistency and that elements always show up
         options.add_argument(f"--window-size={self.app_config['window_size']}")
-        chrome_driver_executable_path = os.path.abspath(os.path.join(__file__, self.customizations['chrome_driver_executable_path']))
+        chrome_driver_executable_path = os.path.abspath(os.path.join(self.current_working_directory, self.app_config['chrome_driver_executable_path']))
         logging.info(f"Chrome driver executable path is '{chrome_driver_executable_path}'")
         return uc.Chrome(executable_path=chrome_driver_executable_path, options=options)
 
@@ -786,7 +787,8 @@ if __name__ == '__main__':
         scraper.driver.close()
     except Exception as e:
         screenshot_name = f"error_{str(int(time.time()))}.png"
-        screenshot_path = os.path.abspath(os.path.join(__file__, "scraper_logs/screenshots", screenshot_name))
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        screenshot_path = os.path.abspath(os.path.join(current_directory, "scraper_logs/screenshots", screenshot_name))
         scraper.driver.save_screenshot(screenshot_path)
         logging.info("!!! RAN INTO A NEW ERROR THAT WE HAVE NOT SEEN BEFORE !!!")
         logging.info(f"Saving screenshot of the session at {screenshot_path}")
