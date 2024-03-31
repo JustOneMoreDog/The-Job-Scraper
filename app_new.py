@@ -42,12 +42,29 @@ def get_job_scrape_dates() -> list:
         file_date_str = filename.split('.')[0]  # Get the timestamp part
         try:
             file_date = datetime.datetime.strptime(file_date_str, '%m_%d_%Y_%H_%M_%S')
-            all_scrape_dates.append(file_date.strftime('%Y-%m-%d-%H'))
+            all_scrape_dates.append(file_date.strftime('%m-%d-%Y'))
         except ValueError:
             pass
     scrape_dates = list(set(all_scrape_dates))
     scrape_dates.sort(reverse=True)
     return scrape_dates
+
+def get_job_scrape_filename(date_str: str) -> str:
+    job_scrape_dir = '.job_scrapes'
+    json_filename = None
+    for scrape in os.listdir(job_scrape_dir):
+        if date_str in scrape:
+            json_filename = scrape
+    return json_filename
+
+def get_latest_job_scrape_data(latest_date: str) -> list:
+    if latest_date:
+        json_filename = get_job_scrape_filename(latest_date)
+        with open(os.path.join('.job_scrapes', json_filename), 'r') as f:
+            latest_data = json.load(f)
+    else:
+        latest_data = []
+    return latest_data
 
 ### FLASK ROUTES ###
 
@@ -55,34 +72,33 @@ def get_job_scrape_dates() -> list:
 def index():
     is_running, running_time, hours_until_next_run = get_scraper_status()
     posting_dates = get_job_scrape_dates()
+    latest_date = posting_dates[0].replace('-', '_') if posting_dates else None
+    latest_data = get_latest_job_scrape_data(latest_date)
     return render_template(
         'index.html',
         demo_state=DEMO_STATE,
         is_running=is_running,
         running_time=running_time,
         hours_until_next_run=hours_until_next_run,
-        posting_dates=posting_dates
+        posting_dates=posting_dates,
+        latest_date=latest_date,
+        latest_data=latest_data
     )
 
 @app.route('/get_job_data', methods=['POST']) 
 def get_job_data():
     if not request.method == 'POST':
         return jsonify({'error': 'Invalid request method'})
-    
     selected_date = request.form['date']
-    job_scrape_dir = 'job_scrapes'
+    job_scrape_dir = '.job_scrapes'
     file_date_str = selected_date.replace('-', '_')
-    json_filename = f'{file_date_str}.json'
-    json_filepath = os.path.join(job_scrape_dir, json_filename)
-    try:
-        with open(json_filepath, 'r') as f:
-            data = json.load(f)
-            return jsonify(data)
-
-    except FileNotFoundError:
+    json_filename = get_job_scrape_filename(file_date_str)
+    if not json_filename:
         return jsonify({'error': 'Data for the selected date not found.'})
-
-
+    json_filepath = os.path.join(job_scrape_dir, json_filename)
+    with open(json_filepath, 'r') as f:
+        data = json.load(f)
+        return jsonify(data)
 
 if __name__ == '__main__':
     app.run(host="127.0.0.1", port=9090)

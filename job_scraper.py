@@ -68,6 +68,7 @@ class TheJobScraper:
         self.current_search = ""
         self.current_location = ""
         self.current_timespan = ""
+        self.errors = []
         # For each search in each location we will break out if we go over the threshold that
         # is set by the customizations['minimum_good_results_per_search_per_location']
         # This helps lower the amount of work that needs to happen
@@ -392,30 +393,44 @@ class TheJobScraper:
         valid_jobs = 0
         for job_posting_number, job_posting in enumerate(all_job_postings[starting_index:]):
             job_posting_object = JobPosting(job_posting, job_posting_number, self)
-            if job_posting_object.is_a_duplicate():
-                self.log(f"Job posting {job_posting_number} was a duplicate")
-                duplicates += 1
-                continue
-            if job_posting_object.is_a_excluded_title_or_company():
-                self.log(f"Job posting {job_posting_number}, '{job_posting_object.title}', on exclusion list")
-                excluded_jobs += 1
+            try:
+                if job_posting_object.is_a_duplicate():
+                    self.log(f"Job posting {job_posting_number} was a duplicate")
+                    duplicates += 1
+                    continue
+                if job_posting_object.is_a_excluded_title_or_company():
+                    self.log(f"Job posting {job_posting_number}, '{job_posting_object.title}', on exclusion list")
+                    excluded_jobs += 1
+                    job_posting_object_json = job_posting_object.get_job_posting_json_data()
+                    self.new_job_scrapes.append(job_posting_object_json)
+                    continue
+                job_posting_object.request_job_posting()
+                if job_posting_object.is_a_excluded_industry_or_location():
+                    self.log(f"Job posting {job_posting_number}, '{job_posting_object.industry}', on exclusion list")
+                    excluded_jobs += 1
+                    job_posting_object_json = job_posting_object.get_job_posting_json_data()
+                    self.new_job_scrapes.append(job_posting_object_json)
+                    continue
+                job_posting_object.populate_job_posting_data()
                 job_posting_object_json = job_posting_object.get_job_posting_json_data()
                 self.new_job_scrapes.append(job_posting_object_json)
-                continue
-            job_posting_object.request_job_posting()
-            if job_posting_object.is_a_excluded_industry_or_location():
-                self.log(f"Job posting {job_posting_number}, '{job_posting_object.industry}', on exclusion list")
-                excluded_jobs += 1
-                job_posting_object_json = job_posting_object.get_job_posting_json_data()
-                self.new_job_scrapes.append(job_posting_object_json)
-                continue
-            job_posting_object.populate_job_posting_data()
-            job_posting_object_json = job_posting_object.get_job_posting_json_data()
-            self.new_job_scrapes.append(job_posting_object_json)
-            self.new_good_job_scrapes_for_search += 1
-            valid_jobs += 1
+                self.new_good_job_scrapes_for_search += 1
+                valid_jobs += 1
+            except (TooManyRequestsException, NoSuchElementException, StaleElementReferenceException) as e:
+                self.log(f"Job posting {job_posting_number} failed with error: {e}")
+                self.process_exception(e)
+                pass
         self.log("Finished getting the job posting data for this batch")
         self.log(f"Duplicates: {duplicates}, Exclusions: {excluded_jobs}, Valid: {valid_jobs}")
+
+    def process_exception(self, e: Exception) -> None:
+        self.errors.append(e)
+        if len(self.errors) >= 10:
+            self.log("Too many errors have occurred")
+            for x, error in enumerate(self.errors):
+                self.log(f"Error {x}:\n{error}")
+            raise e
+        pass
 
     def find_and_press_done_button(self) -> None:
         done_buttons = self.driver.find_elements(By.XPATH, self.app_config['done_button'])
@@ -643,6 +658,8 @@ class JobPosting:
         hidden_company_tags = self.driver.find_elements(By.XPATH, self.app_config["company_name_pre_request"])
         if not hidden_company_tags:
             raise ElementNotFoundException("Could not find the hidden company name tags")
+        if len(hidden_company_tags) <= self.element_index:
+            raise ElementNotFoundException("Could not find the hidden company name tag")
         hidden_company_tag = hidden_company_tags[self.element_index]
         self.company = hidden_company_tag.text.strip()
 
