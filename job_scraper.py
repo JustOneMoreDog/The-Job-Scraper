@@ -267,21 +267,18 @@ class TheJobScraper:
         except NoSuchElementException:
             return True
 
-    @retry(
-        retry=retry_if_exception,
-        wait=wait_fixed(5),
-        stop=stop_after_attempt(2),
-        reraise=True
-    )
     def input_search_phrase_and_location(self, search: str, location: str) -> None:
         self.search_for_jobs_with_phrase(search)
         self.limit_search_results_to_location(location)
         self.load_url()
         current_url_string = urllib.parse.unquote_plus(self.driver.current_url)
+        self.log(f"Checking that the search phrase '{search}' and location '{location}' are in the URL '{current_url_string}'")
         search_in_url = search in current_url_string
         location_in_url = location in current_url_string
         if not search_in_url or not location_in_url:
-            raise UnexpectedBehaviorException(f"Search phrase, '{search}', and or location, '{location}', not in the URL: '{current_url_string}'")
+            message = f"Search phrase, '{search}', and or location, '{location}', not in the URL: '{current_url_string}'"
+            self.log(message)
+            raise UnexpectedBehaviorException(message)
 
     def search_for_jobs_with_phrase(self, search: str) -> None:
         keywords_input_box = self.get_web_element(By.ID, self.app_config['keywords_input_box'])
