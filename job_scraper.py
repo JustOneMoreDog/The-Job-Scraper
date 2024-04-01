@@ -29,6 +29,7 @@ from tenacity import (
     wait_fixed,
 )
 from undetected_chromedriver import Chrome, ChromeOptions
+from fake_useragent import UserAgent
 
 # Global configuration for our exponential backoff
 debug = False
@@ -461,6 +462,7 @@ class TheJobScraper:
             raise e
 
     def load_url(self, url=None) -> None:
+        self.driver.delete_all_cookies()
         if url:
             self.driver.get(url)
         # Stolen code that performs a bunch of checks to verify the page has loaded
@@ -569,8 +571,11 @@ class TheJobScraper:
 
     def initialize_chrome_driver(self) -> Chrome:
         options = ChromeOptions()
+        user_agent = UserAgent()
         logging.info(f"Setting chrome driver to have headless be '{self.app_config['headless']}'")
         options.headless = self.app_config['headless']
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument(f'user-agent={user_agent.random}')
         # Statically defining the window size to ensure consistency and that elements always show up
         options.add_argument(f"--window-size={self.app_config['window_size']}")
         chrome_driver_executable_path = os.path.abspath(os.path.join(self.current_working_directory, self.app_config['chrome_driver_executable_path']))

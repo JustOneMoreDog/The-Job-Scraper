@@ -4,7 +4,7 @@ chrome_driver_executable_path: "chromedriver/chromedriver"
 html_folder: "templates"
 window_size: "1920,1080"
 headless: true
-starting_url: "https://www.linkedin.com/jobs/engineering-jobs-columbia-md"
+starting_url: "https://www.linkedin.com/jobs/search?keywords=Senior%20DevOps%20Engineer&location=Columbia%2C%20MD&geoId=101052838&trk=public_jobs_jobs-search-bar_search-submit&original_referer=https%3A%2F%2Fwww.linkedin.com%2Fjobs%2Fview%2Fsenior-devops-engineer-at-squarepeg-3866131269%2F&position=1&pageNum=0"
 http_429_xpath: "//div[contains(text(), 'HTTP ERROR 429')]"
 redirect_checks:
   - "sessionRedirect"
