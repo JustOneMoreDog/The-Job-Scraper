@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 from time import sleep
 from urllib.parse import parse_qs, urlparse
+import urllib.parse
 
 import undetected_chromedriver as uc
 import yaml
@@ -27,6 +28,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential_jitter,
     wait_fixed,
+    retry_if_exception
 )
 from undetected_chromedriver import Chrome, ChromeOptions
 from fake_useragent import UserAgent
@@ -37,6 +39,10 @@ minimum_jitter = 2
 maximum_jitter = 10
 exponential_jitter_wait = wait_exponential_jitter(5, 1200, 5, random.uniform(minimum_jitter, maximum_jitter))
 retry_attempts = stop_after_attempt(10)
+
+
+class UnexpectedBehaviorException(Exception):
+    pass
 
 
 class RedirectedException(Exception):
@@ -54,6 +60,7 @@ class ElementNotFoundException(Exception):
 class TheJobScraper:
 
     def __init__(self):
+        self.request_counter = 0
         self.current_working_directory = os.path.dirname(os.path.abspath(__file__))
         self.original_url = ""
         self.current_date = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
@@ -212,11 +219,19 @@ class TheJobScraper:
             self.log(f"Checking last '{timespan}' with {self.new_good_job_scrapes_for_search} good posts found so far")
             self.get_job_postings(search, location, timespan, timespan_button_path)
 
+    @retry(
+        retry=retry_if_exception,
+        wait=wait_fixed(5),
+        stop=stop_after_attempt(2),
+        reraise=True
+    )
     def get_job_postings(self, search: str, location: str, timespan: str, timespan_button_path: str) -> None:
         # Quick breakout check that will prevent us from doing extra work should we already be over the min threshold
         if self.new_good_job_scrapes_for_search >= self.customizations['minimum_good_results_per_search_per_location']:
             self.log("Breaking out because we have found enough good jobs")
             return
+        self.log(f"Attempt '{self.get_job_postings.retry.statistics['attempt_number']}' on getting job postings for '{search}' in '{location}' for the last '{timespan}'")
+        self.log("Loading our starting url")
         self.load_url(self.app_config['starting_url'])
         self.log("Inputting search phrase and location")
         self.input_search_phrase_and_location(search, location)
@@ -251,10 +266,21 @@ class TheJobScraper:
         except NoSuchElementException:
             return True
 
+    @retry(
+        retry=retry_if_exception,
+        wait=wait_fixed(5),
+        stop=stop_after_attempt(2),
+        reraise=True
+    )
     def input_search_phrase_and_location(self, search: str, location: str) -> None:
         self.search_for_jobs_with_phrase(search)
         self.limit_search_results_to_location(location)
         self.load_url()
+        current_url_string = urllib.parse.unquote_plus(self.driver.current_url)
+        search_in_url = search in current_url_string
+        location_in_url = location in current_url_string
+        if not search_in_url or not location_in_url:
+            raise UnexpectedBehaviorException(f"Search phrase, '{search}', and or location, '{location}', not in the URL: '{current_url_string}'")
 
     def search_for_jobs_with_phrase(self, search: str) -> None:
         keywords_input_box = self.get_web_element(By.ID, self.app_config['keywords_input_box'])
@@ -462,6 +488,7 @@ class TheJobScraper:
             raise e
 
     def load_url(self, url=None) -> None:
+        self.request_counter += 1
         self.driver.delete_all_cookies()
         if url:
             self.driver.get(url)
