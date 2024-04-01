@@ -4,15 +4,15 @@ import logging.handlers
 import os
 import random
 import time
+import urllib.parse
 from datetime import datetime
 from time import sleep
 from urllib.parse import parse_qs, urlparse
-import urllib.parse
 
 import undetected_chromedriver as uc
 import yaml
 from bs4 import BeautifulSoup
-from scraper_utils import js_conditions
+from fake_useragent import UserAgent
 from selenium.common import (
     ElementNotInteractableException,
     NoSuchElementException,
@@ -24,14 +24,15 @@ from selenium.webdriver.remote.webdriver import WebElement
 from tabulate import tabulate
 from tenacity import (
     retry,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential_jitter,
     wait_fixed,
-    retry_if_exception
 )
 from undetected_chromedriver import Chrome, ChromeOptions
-from fake_useragent import UserAgent
+
+from scraper_utils import js_conditions
 
 # Global configuration for our exponential backoff
 debug = False
