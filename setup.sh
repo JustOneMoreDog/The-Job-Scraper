@@ -6,7 +6,7 @@ sudo apt upgrade -y
 sudo apt install git python3 python3-pip python3-venv git tzdata wget unzip -y
 
 echo "Grabing the latest version of the job scraper"
-git clone -b refactor https://github.com/JustOneMoreDog/The-Job-Scraper.git
+git clone -b dev https://github.com/JustOneMoreDog/The-Job-Scraper.git
 
 echo "Getting chromedriver and Chrome installed"
 version=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
@@ -42,7 +42,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now job-scraper.service
 
-echo "Job scraper is now running and can be accessed by opening your web browsing and navigating to http://127.0.0.1:8080"
+echo "Job scraper is now running and can be accessed by opening your web browsing and navigating to http://127.0.0.1:9090"
 echo "To customize the job scraper, edit the customizations.yaml file in the The-Job-Scraper directory"
 echo "To restart the job scraper, run 'sudo systemctl restart job-scraper'"
 echo -e "If you want to manually run the job scraper then run the following command\ncd ~/The-Job-Scraper && /home/$(whoami)/The-Job-Scraper/virtualenv/bin/python job_scraper.py"

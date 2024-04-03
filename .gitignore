@@ -36,3 +36,14 @@
 # Ignoring job scrape json files
 /.job_scrapes/*
 !/.job_scrapes/.keep
+# Ignoring new log files
+/logs/flask/*.log
+!/logs/flask/.keep
+/logs/scraper/*.log
+!/logs/scraper/.keep
+/logs/screenshots/*.png
+!/logs/screenshots/.keep
+/logs/latest/*
+!/logs/latest/.keep
+/scrapes/*
+!/scrapes/.keep

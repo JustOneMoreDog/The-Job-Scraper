@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+ <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.4/css/dataTables.bootstrap5.min.css">
+ <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+ <script src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
+ <script src="https://cdn.datatables.net/1.11.4/js/dataTables.bootstrap5.min.js"></script>
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+ <title>WIP: Applications</title>
+
+ <style>
+  .dataTables_filter {
+      float: left !important;
+  }
+  
+  #job_table thead th:first-child {
+      border-top-left-radius: 10px;
+  }
+  
+  #job_table thead th:last-child {
+      border-top-right-radius: 10px;
+  }
+  
+  .pagination>li>a {
+      background-color: white;
+      color: #343a40;
+  }
+  
+  .pagination>li>a:focus,
+  .pagination>li>a:hover,
+  .pagination>li>span:focus,
+  .pagination>li>span:hover {
+      color: #5a5a5a;
+      background-color: #eee;
+      border-color: #ddd;
+  }
+  
+  .pagination>.active>a {
+      color: white;
+      background-color: #343a40 !Important;
+      border: solid 1px #343a40 !Important;
+  }
+  
+  .pagination>.active>a:hover {
+      background-color: #343a40 !Important;
+      border: solid 1px #343a40;
+  }
+ </style>
+</head>
+
+<body>
+ <!-- navbar -->
+ <nav class="navbar navbar-dark navbar-expand-lg bg-body-tertiary sticky-top" data-bs-theme="dark">
+  <div class="container-fluid">
+   <a class="navbar-brand" href="/">The Job Scraper</a>
+   <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+   </button>
+
+   <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+     <li class="nav-item">
+      <a class="nav-link active" aria-current="page" href="/">Home</a>
+     </li>
+
+     <li class="nav-item">
+      <a class="nav-link" href="customizations">Customisations</a>
+     </li>
+
+     <li class="nav-item">
+      <a class="nav-link active" href="applications">Applications</a>
+     </li>
+
+     <li class="nav-item">
+      <a class="nav-link" href="statistics">Statistics</a>
+     </li>
+    </ul>
+   </div>
+  </div>
+ </nav>
+
+ <div class="alert alert-dark alert-dismissible fade show" role="alert">
+  <i class="fas fa-exclamation-triangle me-2"></i> Demo State Active - The Job Scraper is in read only mode. No
+  changes will be saved. The Job Scraper is under
+  active development <a href="https://github.com/JustOneMoreDog/The-Job-Scraper">here</a>.
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+ </div>
+
+ <div class=" mt-3">
+
+  <div class="mb-3">
+   <h2>Applied Jobs</h2>
+  </div>
+  <table id="job_table" class="table table-striped custom-datatable" style="width:100%">
+   <thead>
+    <tr>
+     <th>Time</th>
+     <th>Title</th>
+     <th>Company</th>
+     <th>Industry</th>
+     <th>Location</th>
+     <th>Rating</th>
+     <th>Keywords</th>
+     <th>Search</th>
+     <th>URL</th>
+     <th>Content</th>
+     <th>Status</th>
+    </tr>
+   </thead>
+   <tbody>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">1 hour ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">2 hours ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">3 hours ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">4 hours ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+    <tr>
+     <td><a href="">5 hours ago</a></td>
+     <td>Software Engineer</td>
+     <td>Google</td>
+     <td>Technology</td>
+     <td>London</td>
+     <td>5</td>
+     <td>Java, Python, C++</td>
+     <td>Software Engineer</td>
+     <td>https://www.google.com</td>
+     <td>Software Engineer</td>
+     <td></td>
+    </tr>
+   </tbody>
+  </table>
+ </div>
+
+ <script>
+  $(document).ready(function () {
+      $('#job_table thead th').css({
+          'background-color': '#343a40',
+          'color': '#fff'
+      })
+      $('#job_table').DataTable({
+          language: {
+              search: "_INPUT_",
+              searchPlaceholder: "Search..."
+          },
+          dom: "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'>><'row'<'col-sm-12'tr>><'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+          pagingType: 'numbers',
+          pageLength: 10,
+          order: [[1, 'asc']],
+          columnDefs: [
+              {
+                  targets: 10,
+                  render: function (data, type, row) {
+                      return '<select class="form-select select2"><option value="1">Applied</option><option value="2">Rejected</option><option value="3">Interview</option><option value="4">Offer</option></select>';
+                  }
+              }
+          ]
+      });
+      $('.select2').select2();
+  });
+ </script>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+</body>
+
+</html>
