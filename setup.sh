@@ -24,8 +24,7 @@ cd The-Job-Scraper
 python3 -m venv virtualenv
 
 echo "Creating a systemd service file for the job scraper"
-sudo cat <<EOF > /etc/systemd/system/job-scraper.service
-[Unit]
+echo "[Unit]
 Description=The Job Scraper
 After=network.target
 
@@ -37,8 +36,8 @@ User=$(whoami)
 Group=$(whoami)
 
 [Install]
-WantedBy=multi-user.target
-EOF
+WantedBy=multi-user.target" | sudo tee /etc/systemd/system/job-scraper.service
+
 sudo systemctl daemon-reload
 sudo systemctl enable --now job-scraper.service
 
