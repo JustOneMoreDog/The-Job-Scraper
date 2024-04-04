@@ -3,7 +3,7 @@ cd ~
 echo "Performing updates and installing dependencies"
 sudo apt update -y 
 sudo apt upgrade -y 
-sudo apt install git python3 python3-pip python3-venv git tzdata wget unzip -y
+sudo apt install git build-essential python3 python3-pip python3-venv git tzdata wget unzip libx11-dev xorg-dev libgl1-mesa-dev libglu1-mesa-dev  -y
 
 echo "Grabing the latest version of the job scraper"
 git clone -b devel https://github.com/JustOneMoreDog/The-Job-Scraper.git
@@ -22,6 +22,9 @@ cp The-Job-Scraper/customizations_default.yaml The-Job-Scraper/customizations.ya
 echo "Creating our Python virtual environment"
 cd The-Job-Scraper
 python3 -m venv virtualenv
+/home/$(whoami)/The-Job-Scraper/virtualenv/bin/python -m pip install --upgrade pip
+/home/$(whoami)/The-Job-Scraper/virtualenv/bin/python -m pip install --upgrade setuptools
+/home/$(whoami)/The-Job-Scraper/virtualenv/bin/python -m pip install -r /home/$(whoami)/The-Job-Scraper/requirements.txt
 
 echo "Creating a systemd service file for the job scraper"
 echo "[Unit]
