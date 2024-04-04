@@ -6,7 +6,7 @@ sudo apt upgrade -y
 sudo apt install git python3 python3-pip python3-venv git tzdata wget unzip -y
 
 echo "Grabing the latest version of the job scraper"
-git clone -b dev https://github.com/JustOneMoreDog/The-Job-Scraper.git
+git clone -b devel https://github.com/JustOneMoreDog/The-Job-Scraper.git
 
 echo "Getting chromedriver and Chrome installed"
 version=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
