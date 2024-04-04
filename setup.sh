@@ -39,8 +39,8 @@ Group=$(whoami)
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload
-systemctl enable --now job-scraper.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now job-scraper.service
 
 echo "Job scraper is now running and can be accessed by opening your web browsing and navigating to http://127.0.0.1:9090"
 echo "To customize the job scraper, edit the customizations.yaml file in the The-Job-Scraper directory"
