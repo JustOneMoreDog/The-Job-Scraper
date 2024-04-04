@@ -27,8 +27,6 @@ from tenacity import (
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential_jitter,
-    wait_fixed,
-    retry_if_not_result,
 )
 from undetected_chromedriver import Chrome, ChromeOptions
 
@@ -427,7 +425,7 @@ class TheJobScraper:
                 self.new_job_scrapes.append(job_posting_object_json)
                 self.new_good_job_scrapes_for_search += 1
                 valid_jobs += 1
-            except (TooManyRequestsException, NoSuchElementException, StaleElementReferenceException, ElementNotFoundException) as e:
+            except Exception as e:
                 self.annihilate_the_trackers()
                 self.log(f"Job posting {job_posting_number} failed with error: {e}")
                 if self.is_page_sign_in_form():
@@ -692,7 +690,7 @@ class JobPosting:
     @retry(
         retry=retry_if_exception_type((TooManyRequestsException, NoSuchElementException)),
         wait=exponential_jitter_wait,
-        stop=max_retry_attempts,
+        stop=small_retry_attempts,
         reraise=False
     )
     def request_job_posting(self) -> None:
