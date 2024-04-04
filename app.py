@@ -53,7 +53,7 @@ def close_observers(obs):
         observer.stop()
         observer_thread.join()
         
-def setup_log_watcher(log_directory: str, symlink_path: str) -> tuple[BaseObserver, Thread]:
+def setup_log_watcher(log_directory: str, symlink_path: str):
     event_handler = LogWatcher(symlink_path)
     observer = Observer()
     observer.schedule(event_handler, log_directory, recursive=False)
@@ -61,7 +61,7 @@ def setup_log_watcher(log_directory: str, symlink_path: str) -> tuple[BaseObserv
     observer_thread.start()
     return observer, observer_thread
 
-def setup_watchdogs() -> list[tuple[BaseObserver, Thread]]:
+def setup_watchdogs() -> list:
     observers = []
     for dir in os.listdir("logs"):
         log_directory = os.path.abspath(os.path.join(WORKING_DIR, "logs", dir))
