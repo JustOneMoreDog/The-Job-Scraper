@@ -580,16 +580,26 @@ class TheJobScraper:
         all_jobs_backup_path = all_jobs_path + ".old"
         self.save_job_scrape(all_jobs, all_jobs_backup_path)
         return all_jobs
+    
+    def get_random_user_agent(self) -> str:
+        agents = UserAgent()
+        platforms_choices = [item for item in agents.platforms if item != "mobile" and item != "tablet"]
+        os_choices = [item for item in agents.os if item != "android" and item != "ios"]
+        user_agent = UserAgent(os=os_choices, platforms=platforms_choices)
+        random_agent = user_agent.random
+        logging.info(f"Setting user agent to be '{random_agent}'")
+        return random_agent
 
     def initialize_chrome_driver(self) -> Chrome:
         options = ChromeOptions()
-        user_agent = UserAgent()
         logging.info(f"Setting chrome driver to have headless be '{self.app_config['headless']}'")
         options.headless = self.app_config['headless']
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument(f'user-agent={user_agent.random}')
+        options.add_argument(f'--user-agent={self.get_random_user_agent()}')
         # Statically defining the window size to ensure consistency and that elements always show up
         options.add_argument(f"--window-size={self.app_config['window_size']}")
+        ublock_path = os.path.abspath(os.path.join(self.current_working_directory, "ublock"))
+        options.add_argument('--load-extension=' + ublock_path)
+        logging.info("uBlock extension added to Chrome driver")
         chrome_driver_executable_path = os.path.abspath(os.path.join(self.current_working_directory, self.app_config['chrome_driver_executable_path']))
         logging.info(f"Chrome driver executable path is '{chrome_driver_executable_path}'")
         return uc.Chrome(executable_path=chrome_driver_executable_path, options=options)

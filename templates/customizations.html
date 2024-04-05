@@ -68,8 +68,16 @@
                 </ul>
             </div>
         </div>
-    </nav> <!-- alert -->
-    <div class="alert alert-dark alert-dismissible fade show" role="alert"> <i class="fas fa-exclamation-triangle me-2"></i> Demo State Active - The Job Scraper is in read only mode. No changes will be saved. The Job Scraper is under active development <a href="https://github.com/JustOneMoreDog/The-Job-Scraper">here</a>. <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button> </div> <!-- edit customizations -->
+    </nav> 
+    <!-- alert -->
+    {% if demo_state %}
+    <div class="alert alert-dark alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-triangle me-2"></i> Demo State Active - The Job Scraper is in read only mode. No changes will be saved.
+    <br> The Job Scraper is under active development <a href="https://github.com/JustOneMoreDog/The-Job-Scraper">here</a>.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+    <!-- edit customizations -->
     <div class="container mt-5">
         <div class="row">
             <h2>Edit Customizations</h2>
@@ -164,7 +172,7 @@
             <div class=" mt-2"> <label for="minimum_good_results_per_search_per_location"> Target Minimum Valid Job Postings Per Search Term </label>
                 <div class="row mt-2" id="minimum-good-results-error-container"></div> <input type="number" class="form-control" id="minimum_good_results_per_search_per_location" value="{{ data.minimum_good_results_per_search_per_location }}">
             </div> <!-- Save Button -->
-            <div class="row mt-2 mb-2 container justify-content-end"> <button type="submit" class="btn btn-dark col-2" id="save-button">Save</button> </div>
+            <div class="row mt-2 mb-2 container justify-content-end"> <button type="submit" class="btn btn-dark col-2" id="save-button" style="border: 1px solid #495057">Save</button> </div>
         </form>
     </div>
     <script>

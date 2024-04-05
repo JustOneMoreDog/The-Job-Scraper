@@ -17,7 +17,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-DEMO_STATE = True
+DEMO_STATE = False
 DEBUG_MODE = True
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 app = Flask(__name__)
@@ -193,7 +193,7 @@ def get_job_data():
 @app.route('/customizations')
 def customizations():
     customization_data = load_customizations()
-    return render_template('customizations.html', data=customization_data)
+    return render_template('customizations.html', data=customization_data, demo_state=DEMO_STATE)
 
 @app.route('/save_customizations', methods=['POST'])
 def save_customizations():
