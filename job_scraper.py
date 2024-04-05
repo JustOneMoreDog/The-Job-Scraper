@@ -8,10 +8,10 @@ import urllib.parse
 from datetime import datetime
 from time import sleep
 from urllib.parse import parse_qs, urlparse
+from html import escape
 
 import undetected_chromedriver as uc
 import yaml
-from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from selenium.common import (
     ElementNotInteractableException,
@@ -800,8 +800,8 @@ class JobPosting:
     def get_job_posting_content(self) -> str:
         job_posting_details = self.get_web_element(By.XPATH, self.app_config['job_posting_details_section'])
         job_posting_content_html = job_posting_details.get_attribute('innerHTML')
-        job_posting_details_soup = BeautifulSoup(job_posting_content_html, "html.parser")
-        return str(job_posting_details_soup.prettify())
+        job_posting_details_escaped = escape(job_posting_content_html)
+        return str(job_posting_details_escaped)
 
     def get_job_posting_date(self) -> str:
         job_posting_date_element = self.get_web_element(
