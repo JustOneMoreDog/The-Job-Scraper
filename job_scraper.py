@@ -129,7 +129,8 @@ class TheJobScraper:
         })
 
     def iterate_over_searches(self) -> None:
-        for search in self.customizations['searches']:
+        searches = list(set(self.customizations['searches']))
+        for search in searches:
             self.log(f"Scraping LinkedIn for jobs with the keyword '{search}'")
             self.current_search = search
             self.new_good_job_scrapes_for_search = 0
@@ -137,7 +138,7 @@ class TheJobScraper:
             self.iterate_over_locations(search)
 
     def iterate_over_locations(self, search: str) -> None:
-        locations = self.customizations['locations']
+        locations = list(set(self.customizations['locations']))
         # For each location we will take our search phrase and check for jobs across the three timespans
         for location in locations:
             self.current_location = location

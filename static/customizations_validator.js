@@ -137,12 +137,12 @@ function validateCustomizationsForm(event) {
     }
     console.log("All input is valid constructing our customizations JSON object")
     const customizations = {
-        searches: searchTerms,
-        locations: searchLocations,
-        excluded_locations: excludedLocations,
-        excluded_industries: excludedIndustries,
-        excluded_companies: excludedCompanies,
-        excluded_title_keywords: excludedJobTitles,
+        searches: [...new Set(searchTerms)],
+        locations: [...new Set(searchLocations)],
+        excluded_locations: [...new Set(excludedLocations)],
+        excluded_industries: [...new Set(excludedIndustries)],
+        excluded_companies: [...new Set(excludedCompanies)],
+        excluded_title_keywords: [...new Set(excludedJobTitles)],
         word_weights: keywordWeights,
         minimum_good_results_per_search_per_location: minimum_good_results,
         include_hybrid_jobs: includeHybridJobs,
