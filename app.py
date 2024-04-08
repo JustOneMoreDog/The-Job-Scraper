@@ -282,7 +282,7 @@ except Exception as e:
 if __name__ == '__main__':
     try:
         config = {}
-        with open('config.yaml', 'r') as f:
+        with open('server_config.yaml', 'r') as f:
             config = yaml.safe_load(f)
         app.run(host=config['flask_ip_address'], port=config['flask_port'], debug=config['flask_debug_mode'])
     except Exception as e:
