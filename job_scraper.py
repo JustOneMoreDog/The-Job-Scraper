@@ -3,12 +3,14 @@ import logging
 import logging.handlers
 import os
 import random
+import re
 import time
 import urllib.parse
 from datetime import datetime
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from html import escape
+import us
 
 import undetected_chromedriver as uc
 import yaml
@@ -36,7 +38,7 @@ from scraper_utils import js_conditions
 debug = False
 minimum_jitter = int(random.uniform(1, 3))
 maximum_jitter = int(random.uniform(8, 10))
-exponential_jitter_wait = wait_exponential_jitter(5, 10800, 5, random.uniform(minimum_jitter, maximum_jitter))
+exponential_jitter_wait = wait_exponential_jitter(5, 7200, 2, random.uniform(minimum_jitter, maximum_jitter))
 small_retry_attempts = stop_after_attempt(3)
 max_retry_attempts = stop_after_attempt(10)
 retry_if_any_exception = retry_if_exception_type(Exception)
@@ -379,11 +381,14 @@ class TheJobScraper:
             if page_height_script <= total_scrolled_height:
                 try:
                     more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
+                    logging.info("There is a more jobs button and we are going to press it")
                     more_jobs_button.click()
+                    logging.info("Pressed the more jobs button and returning True")
                     return True
                 except (NoSuchElementException, ElementNotInteractableException):
-                    self.log("At the bottom and do not see the more jobs button")
+                    self.log("At the bottom and do not see the more jobs button and or cannot interact with it")
                     return False
+        logging.info("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
         return True
 
     def get_job_results_list(self) -> list:
@@ -407,14 +412,15 @@ class TheJobScraper:
                     self.log(f"Job posting {job_posting_number} was a duplicate")
                     duplicates += 1
                     continue
-                if job_posting_object.is_a_excluded_title_or_company():
-                    self.log(f"Job posting {job_posting_number}, '{job_posting_object.title}', on exclusion list")
+                if job_posting_object.is_a_excluded_title_or_company_or_location():
+                    job_posting_details = f"'{job_posting_object.title}' at '{job_posting_object.company}' in '{job_posting_object.location}'"
+                    self.log(f"Job posting {job_posting_number}, {job_posting_details}, in on the exclusion list")
                     excluded_jobs += 1
                     job_posting_object_json = job_posting_object.get_job_posting_json_data()
                     self.new_job_scrapes.append(job_posting_object_json)
                     continue
                 job_posting_object.request_job_posting()
-                if job_posting_object.is_a_excluded_industry_or_location():
+                if job_posting_object.is_a_excluded_industry():
                     self.log(f"Job posting {job_posting_number}, '{job_posting_object.industry}', on exclusion list")
                     excluded_jobs += 1
                     job_posting_object_json = job_posting_object.get_job_posting_json_data()
@@ -662,24 +668,123 @@ class JobPosting:
         full_url = self.url_element.get_property(name="href")
         self.url = full_url.split("?")[0]
 
-    def is_a_excluded_title_or_company(self) -> bool:
-        self.get_job_posting_title_pre_request()
+    def is_a_excluded_title_or_company_or_location(self) -> bool:
+        try:
+            self.parse_posting_element_text()
+        except UnexpectedBehaviorException as e:
+            self.log(f"Failed to parse the posting element text: {e}\nSkipping this job posting")
+            return True
         if any(t for t in self.customizations['excluded_title_keywords'] if t.lower().strip() in self.title.lower()):
             self.keywords.append("TITLE")
             self.rating = -999
             self.log(f"Skipping as '{self.title}' is in our exclusion list")
             return True
-        self.get_job_posting_company_pre_request()
         if any(c for c in self.customizations['excluded_companies'] if c.lower().strip() in self.company.lower()):
             self.keywords.append("COMPANY")
             self.rating = -999
             self.log(f"Skipping as '{self.company}' is in our exclusion list")
             return True
+        if any(l for l in self.customizations['excluded_locations'] if l.lower().strip() in self.location.lower()):
+            self.keywords.append("LOCATION")
+            self.rating = -999
+            self.log(f"Skipping as '{self.location}' is in our exclusion list")
+            return True
         return False
+    
+    def parse_posting_element_text(self) -> None:
+        posting_element_text = self.posting_element.text.strip().split("\n")
+        if len(posting_element_text) == 0:
+            raise UnexpectedBehaviorException("Could not find any text in the posting element")
+        self.log(f"Parsing the posting element text for job title: '{posting_element_text}'")
+        self.pop_title_from_posting_element_text(posting_element_text)
+        self.log(f"Parsing the posting element text for unwanted elements: '{posting_element_text}'")
+        self.pop_unwanted_elements_from_posting_element_text(posting_element_text)
+        self.log(f"Parsing the posting element text for timespan: '{posting_element_text}'")
+        self.pop_timespan_from_posting_element_text(posting_element_text)
+        self.log(f"Parsing the posting element text for location: '{posting_element_text}'")
+        self.pop_location_from_posting_element_text(posting_element_text)
+        self.log(f"Parsing the posting element text for company name: '{posting_element_text}'")
+        self.pop_company_from_posting_element_text(posting_element_text)
 
-    def get_job_posting_title_pre_request(self) -> None:
-        self.url_element = self.get_web_element(By.TAG_NAME, 'a', self.posting_element)
-        self.title = self.clean_string(self.url_element.text)
+    def pop_company_from_posting_element_text(self, posting_element_text: list[str]) -> None:
+        if len(posting_element_text) == 0:
+            self.log("No elements left in the posting element text")
+            self.company = "Unknown"
+            return 
+        company = posting_element_text.pop(0)
+        self.company = self.clean_string(company)
+        self.log(f"Job company has been set to '{self.company}'")
+    
+    def pop_timespan_from_posting_element_text(self, posting_element_text: list[str]) -> None:
+        timespan_elements = [
+            'minute',
+            'hour',
+            'day',
+            'week',
+            'month',
+        ]
+        # We do not need to set self.posting_time here because it gets properly set later on
+        for timespan_element in timespan_elements:
+            for i, element in enumerate(posting_element_text):
+                if timespan_element.lower() in element.lower() and " ago" in element.lower():
+                    _ = posting_element_text.pop(i)
+                    return
+    
+    def pop_location_from_posting_element_text(self, posting_element_text: list[str]) -> None:
+        location = "Unknown"
+        # First we try and get an easy win by looking for the state abbreviation 
+        location_pattern = pattern = r", ([A-Z][A-Z])$"
+        states = us.states.STATES_AND_TERRITORIES
+        us_state_abbreviations = [state.abbr for state in states]
+        for i, element in enumerate(posting_element_text):
+            match = re.search(location_pattern, element)
+            if not match:
+                continue
+            state_abbreviation = match.group(1)
+            if state_abbreviation not in us_state_abbreviations:
+                continue
+            location = element
+            _ = posting_element_text.pop(i)
+            self.location = self.clean_string(location)
+            self.log(f"Job location has been set to '{self.location}'")
+            return
+        self.log("Unable to find a location string using state abbreviations")
+        # Maybe the locations is just ye ole United States
+        for i, element in enumerate(posting_element_text):
+            if "United States" in element:
+                location = element
+                _ = posting_element_text.pop(i)
+                self.location = self.clean_string(location)
+                self.log(f"Job location has been set to '{self.location}'")
+                return
+        self.log("Unable to find a location string using United States")
+        # Last ditch effort to determine location will be us using the excluded locations list from the customizations file
+        for i, element in enumerate(posting_element_text):
+            if any(l for l in self.customizations['excluded_locations'] if l.lower().strip() in element.lower()):
+                location = element
+                _ = posting_element_text.pop(i)
+                self.location = self.clean_string(location)
+                self.log(f"Job location has been set to '{self.location}'")
+                return
+        self.log("Unable to find a location string using the excluded locations list. This is bad.")
+    
+    def pop_unwanted_elements_from_posting_element_text(self, posting_element_text: list[str]) -> None:
+        unwanted_elements = [
+            'Actively Hiring',
+            'Be an early applicant'
+        ]
+        for unwanted_element in unwanted_elements:
+            for i, element in enumerate(posting_element_text):
+                if unwanted_element.lower() in element.lower():
+                    _ = posting_element_text.pop(i)
+    
+    def pop_title_from_posting_element_text(self, posting_element_text: list[str]) -> None:
+        title = posting_element_text.pop(0)
+        for i, element in enumerate(posting_element_text):
+            if title.lower() in element.lower():
+                _ = posting_element_text.pop(i)
+        self.title = self.clean_string(title)
+        self.log(f"Job title has been set to '{self.title}'")
 
     def clean_string(self, text: str) -> str:
         text = text.strip()
@@ -688,15 +793,6 @@ class JobPosting:
         text = text[:200]
         return text
 
-    def get_job_posting_company_pre_request(self) -> None:
-        hidden_company_tags = self.driver.find_elements(By.XPATH, self.app_config["company_name_pre_request"])
-        if not hidden_company_tags:
-            raise ElementNotFoundException("Could not find the hidden company name tags in the first place")
-        if len(hidden_company_tags) <= self.element_index:
-            raise ElementNotFoundException("Could not find the hidden company name tag where we expected it to be on the page")
-        hidden_company_tag = hidden_company_tags[self.element_index]
-        self.company = self.clean_string(hidden_company_tag.text)
-
     @retry(
         retry=retry_if_exception_type((TooManyRequestsException, NoSuchElementException)),
         wait=exponential_jitter_wait,
@@ -704,6 +800,7 @@ class JobPosting:
         reraise=False
     )
     def request_job_posting(self) -> None:
+        self.log("Requesting the job posting details")
         attempt_number = self.request_job_posting.retry.statistics["attempt_number"]
         if attempt_number > 1:
             self.log(f"This is attempt {attempt_number} to request the job posting details")
@@ -718,18 +815,12 @@ class JobPosting:
             # Now that we have refreshed our posting_element we can have the retry class start the function over
             raise e
 
-    def is_a_excluded_industry_or_location(self) -> bool:
+    def is_a_excluded_industry(self) -> bool:
         self.get_job_posting_industry()
         if any(i for i in self.customizations['excluded_industries'] if i.lower().strip() in self.industry.lower()):
             self.keywords.append("INDUSTRY")
             self.rating = -999
             self.log(f"Skipping as '{self.industry}' is in our exclusion list")
-            return True
-        self.get_job_posting_location()
-        if any(m for m in self.customizations['excluded_locations'] if m.lower().strip() in self.location.lower()):
-            self.keywords.append("LOCATION")
-            self.rating = -999
-            self.log(f"Skipping as '{self.location}' is in our exclusion list")
             return True
         return False
 
@@ -821,13 +912,6 @@ class JobPosting:
             sub_section_name = self.get_web_element(By.TAG_NAME, "span", sub_section)
             sub_section_text = sub_section_name.text.strip()
             self.industry = sub_section_text
-
-    def get_job_posting_location(self) -> None:
-        job_posting_location = self.get_web_element(
-            By.XPATH, self.app_config['job_posting_location'], self.posting_element
-        )
-        job_posting_location_text = job_posting_location.text.strip()
-        self.location = job_posting_location_text
 
 
 if __name__ == '__main__':
