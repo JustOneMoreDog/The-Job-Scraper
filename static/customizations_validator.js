@@ -7,29 +7,27 @@ function displayError(errorContainer, message) {
 // Helper function to verify that all strings in the array are English characters
 function verifyEnglishCharacters(array) {
     return array.every(function(str) {
-        return /^[A-Za-z\s-]+$/.test(str);
+        return /^[A-Za-z\s-,]+$/.test(str);
     });
 }
 
 // Function that gets the value of an input field using jQuery, verifies that there is a value, and if so splits the values out into an array
 function getInputValue(inputField, emptyAllowed) {
-    // console.log("Getting input value")
-    const inputValue = $(inputField).val();
-    // console.log(inputValue)
-    if (emptyAllowed && inputValue.length === 0) {
-        // console.log("Returning empty array")
-        return [];
+    const inputArray = [];
+    $(inputField).find('option:selected').each(function() {
+        const locationText = $(this).val().trim();
+        inputArray.push(locationText);
+    }).get();
+    console.log("Input array: '" + inputArray + "'")
+    if (emptyAllowed && inputArray.length === 0) {
+        return inputArray;
     }
-    if (!inputValue) {
-        // console.log("No input value")
+    if (inputArray.length === 0) {
         return null;
-    }
-    const inputArray = String(inputValue).split(',').map(function(str) { return str.trim(); });
+    }    
     if (!verifyEnglishCharacters(inputArray)) {
-        // console.log("not valid english characters")
         return null;
     }
-    // console.log("Returning input array: " + inputArray)
     return inputArray
 }
 

@@ -84,11 +84,15 @@
         </div>
         <form>
             <div class="row"> <label for="search_terms">Search Terms</label>
-                <div class="row mt-2" id="search-terms-error-container"></div> <select id="search_terms" class="form-control select_field" multiple="multiple"> {% for term in data.searches %} <option value="{{ term }}" selected>{{ term }}</option> {% endfor %} </select>
+                <div class="row mt-2" id="search-terms-error-container"></div>
+                <select id="search_terms" class="form-control select_field" multiple="multiple"> 
+                    {% for term in data.searches %} 
+                        <option value="{{ term }}" selected>{{ term }}</option> 
+                    {% endfor %}
+                </select>
             </div>
             <div class="row mt-2"> <label for="search_locations">Search Locations</label>
-                <div class="row mt-2" id="search-location-error-container"></div> <select id="search_locations" class="form-control select_field" multiple="multiple"> {% for locations in data.locations %} <option value="{{ locations }}" selected>{{ locations
-                            }}</option> {% endfor %} </select>
+                <div class="row mt-2" id="search-location-error-container"></div> <select id="search_locations" class="form-control select_field" multiple="multiple"> {% for location in data.locations %} <option value="{{ location }}" selected>{{ location }}</option> {% endfor %} </select>
             </div>
             <div class="row mt-2"> <label for="excluded_locations">Excluded Locations</label>
                 <div class="row mt-2" id="excluded-locations-error-container"></div> <select id="excluded_locations" class="form-control select_field" multiple="multiple"> {% for excluded_location in data.excluded_locations %} <option value="{{ excluded_location }}" selected>{{ excluded_location }}</option> {% endfor %} </select>
