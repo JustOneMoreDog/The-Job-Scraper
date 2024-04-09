@@ -734,9 +734,10 @@ class JobPosting:
     def pop_location_from_posting_element_text(self, posting_element_text: list[str]) -> None:
         location = "Unknown"
         # First we try and get an easy win by looking for the state abbreviation 
-        location_pattern = pattern = r", ([A-Z][A-Z])$"
+        location_pattern = r", ([A-Z][A-Z])$"
         states = us.states.STATES_AND_TERRITORIES
         us_state_abbreviations = [state.abbr for state in states]
+        us_state_abbreviations.append("DC")
         for i, element in enumerate(posting_element_text):
             match = re.search(location_pattern, element)
             if not match:
@@ -744,8 +745,7 @@ class JobPosting:
             state_abbreviation = match.group(1)
             if state_abbreviation not in us_state_abbreviations:
                 continue
-            location = element
-            _ = posting_element_text.pop(i)
+            location = posting_element_text.pop(i)
             self.location = self.clean_string(location)
             self.log(f"Job location has been set to '{self.location}'")
             return
@@ -753,17 +753,22 @@ class JobPosting:
         # Maybe the locations is just ye ole United States
         for i, element in enumerate(posting_element_text):
             if "United States" in element:
-                location = element
-                _ = posting_element_text.pop(i)
+                location = posting_element_text.pop(i)
                 self.location = self.clean_string(location)
                 self.log(f"Job location has been set to '{self.location}'")
                 return
         self.log("Unable to find a location string using United States")
-        # Last ditch effort to determine location will be us using the excluded locations list from the customizations file
+        # Next logical thing to try is our excluded locations and locations list from the customizations file
         for i, element in enumerate(posting_element_text):
-            if any(l for l in self.customizations['excluded_locations'] if l.lower().strip() in element.lower()):
-                location = element
-                _ = posting_element_text.pop(i)
+            if any(l for l in (self.customizations['excluded_locations'] + self.customizations['locations']) if l.lower().strip() in element.lower()):
+                location = posting_element_text.pop(i)
+                self.location = self.clean_string(location)
+                self.log(f"Job location has been set to '{self.location}'")
+                return
+        # Based off of testing one last ditch effort to determine the location is to see if there is an element that ends in 'Area'
+        for i, element in enumerate(posting_element_text):
+            if element.endswith(" Area"):
+                location = posting_element_text.pop(i)
                 self.location = self.clean_string(location)
                 self.log(f"Job location has been set to '{self.location}'")
                 return

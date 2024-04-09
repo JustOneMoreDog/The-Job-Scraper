@@ -58,7 +58,9 @@ def run_job_scraper(retry: bool = True) -> None:
     if job_scraper.poll() is None:
         logging.info("Job scraper has been running for over 4 hours. Killing the process.")
         scraper_had_issues = True
-    logging.info(f"Job scraper ran for {int(int(time.time())-int(start_time)/60)} minutes")
+    elapsed_time = time.gmtime(int(time.time()) - int(start_time))
+    formatted_runtime = time.strftime("%H:%M:%S", elapsed_time)
+    logging.info(f"Job scraper ran for {formatted_runtime}")
     kill_the_parents_and_children(job_scraper.pid)
     kill_chrome_processes()
     logging.info("Killed the parent and child processes")
