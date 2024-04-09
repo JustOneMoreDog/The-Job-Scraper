@@ -92,11 +92,13 @@ function validateCustomizationsForm(event) {
     const keywordWeights = getKeywordWeights(keywordWeightsErrorContainer);
     const minimum_good_results = parseInt($('#minimum_good_results_per_search_per_location').val(), 10);
     const includeHybridJobs = $('#include_hybrid_jobs').is(':checked');
-    const experienceLevels = {};
-    $('input[name^="experience_levels["]:checked').each(function() {
-        const levelName = $(this).attr('id');
-        experienceLevels[levelName] = true;
-    });
+    const experienceLevels = {
+        "Associate": true,
+        "Director": false,
+        "Entry level": true,
+        "Internship": false,
+        "Mid-Senior level": true
+    };
 
     if (!searchTerms) {
         displayError(searchTermErrorContainer, "Must provide at least one search term and all search terms must be English characters.");

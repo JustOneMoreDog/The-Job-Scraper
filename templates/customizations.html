@@ -127,43 +127,8 @@
                             </tr> {% endfor %} </tbody>
                     </table> <button type="button" class="mb-2 btn btn-success add-keyword-btn" id="addKeywordBtn"> <i class="fas fa-plus"></i> Add Keyword </button>
                 </div>
-            </div> <!-- Experience Levels -->
-            <div class="row mt-2"> <label for="experience_levels" class="col-sm-2 col-form-label">Experience Levels</label>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check"> <input class="form-check-input" type="checkbox" name="experience_levels[Internship]" id="internship" {% if
-                                    data.experience_levels.get('Internship',
-                                    False) %}checked {% endif %}> <label class="form-check-label" for="internship"> Internship </label> </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check"> <input class="form-check-input" type="checkbox" name="experience_levels[entry]" id="entry" {% if data.experience_levels.get('Entry
-                                    level', False) %}checked {% endif %}> <label class="form-check-label" for="entry"> Entry </label> </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check"> <input class="form-check-input" type="checkbox" name="experience_levels[Associate]" id="associate" {% if
-                                    data.experience_levels.get('Associate',
-                                    False) %}checked {% endif %}> <label class="form-check-label" for="associate"> Associate </label> </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check"> <input class="form-check-input" type="checkbox" name="experience_levels[Mid-Senior level]" id="midsenior" {% if
-                                    data.experience_levels.get('Mid-Senior
-                                    level', False) %}checked {% endif %}> <label class="form-check-label" for="midsenior"> Mid Senior </label> </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-sm-10">
-                        <div class="form-check"> <input class="form-check-input" type="checkbox" name="experience_levels[Director]" id="director" {% if
-                                    data.experience_levels.get('Director',
-                                    False) %}checked {% endif %}> <label class="form-check-label" for="director"> Director </label> </div>
-                    </div>
-                </div>
-            </div> <!-- Including Hybrid Jobs -->
+            </div> 
+            <!-- Including Hybrid Jobs -->
             <div class="row mt-2"> <label for="hyrbid_jobs" class="col-sm-2 col-form-label">Hybrid Jobs</label>
                 <div class="row">
                     <div class="col-sm-10">
