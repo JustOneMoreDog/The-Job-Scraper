@@ -52,6 +52,13 @@
             padding: 0.2rem 0.5rem;
             font-size: 0.875rem;
         }
+
+        /* increases the font size of labels and makes them bold */
+        label {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
     </style>
 </head>
 
@@ -80,7 +87,7 @@
     <!-- edit customizations -->
     <div class="container mt-5">
         <div class="row">
-            <h2>Edit Customizations</h2>
+            <h1>Search Customizations</h1>
         </div>
         <form>
             <div class="row"> <label for="search_terms">Search Terms</label>
@@ -129,12 +136,12 @@
                 </div>
             </div> 
             <!-- Including Hybrid Jobs -->
-            <div class="row mt-2"> <label for="hyrbid_jobs" class="col-sm-2 col-form-label">Hybrid Jobs</label>
+            <div class="row mt-2">
                 <div class="row">
                     <div class="col-sm-10">
                         <div class="form-check"> <input class="form-check-input" type="checkbox" name="include_hybrid_jobs" id="include_hybrid_jobs" {% if
                                     data.include_hybrid_jobs %}checked {% endif
-                                    %}> <label class="form-check-label" for="hyrbid_jobs"> Include Them </label> </div>
+                                    %}> <label class="form-check-label" for="hyrbid_jobs"> Include Hybrid Jobs </label> </div>
                     </div>
                 </div>
             </div>

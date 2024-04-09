@@ -7,7 +7,7 @@ function displayError(errorContainer, message) {
 // Helper function to verify that all strings in the array are English characters
 function verifyEnglishCharacters(array) {
     return array.every(function(str) {
-        return /^[A-Za-z\s-,]+$/.test(str);
+        return /^[A-Za-z\s-,\+]+$/.test(str);
     });
 }
 
