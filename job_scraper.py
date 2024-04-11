@@ -657,9 +657,19 @@ class JobPosting:
 
     def is_a_duplicate(self) -> bool:
         self.get_job_posting_url_pre_request()
-        for job in (self.previously_scraped_jobs + self.newly_scraped_jobs):
-            duplicate = job['url'] == self.url
-            if duplicate:
+        if not self.url:
+            self.log("Could not get a valid URL for the job posting...skipping")
+            return True
+        split_newly_found_job_url = self.url.split("/view/")
+        if len(split_newly_found_job_url) != 2:
+            self.log(f"Failed to split the URL, '{self.url}', for the job posting...skipping")
+            return True
+        newly_found_job_url = split_newly_found_job_url[1].lower()
+        self.log(f"Checking if the job posting URL, '{newly_found_job_url}', has been previously scraped")
+        for job in (self.newly_scraped_jobs + self.previously_scraped_jobs):
+            previously_found_job_url = job['url'].split("/view/")[1].lower()
+            duplicate_job_posting_url = previously_found_job_url == newly_found_job_url
+            if duplicate_job_posting_url:
                 self.log("Job posting has been previously scraped...skipping")
                 return True
         return False
@@ -667,6 +677,7 @@ class JobPosting:
     def get_job_posting_url_pre_request(self) -> None:
         self.url_element = self.get_web_element(By.TAG_NAME, 'a', self.posting_element)
         full_url = self.url_element.get_property(name="href")
+        self.log(f"Setting the job posting URL to '{full_url}'") 
         self.url = full_url.split("?")[0]
 
     def is_a_excluded_title_or_company_or_location(self) -> bool:
