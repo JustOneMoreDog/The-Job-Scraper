@@ -1,0 +1,126 @@
+# W.I.P. CloudFormation template 
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates all the needed resources to run the job scraper
+Outputs:
+  SSHPrivateKeyARN:
+    Description: The ARN of the SSM parameter storing the private key
+    Value: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/jobscraper/privatekey' 
+
+Resources:
+  # IAM Role for Lambda
+  PowerCycleLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: EC2PowerCyclePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:StopInstances'
+                  - 'ec2:StartInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                Resource: !GetAtt JobScraperInstance.Arn  
+
+  # EC2 Instance  
+  JobScraperInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0149b2da6ceec4bb0 # Ubuntu 22.04
+      InstanceType: t2.medium
+      KeyName: !Ref EC2KeyPair
+      UserData:
+        Fn::Base64: "echo 'hello world'" # TO:DO replace this with the curl command that gets the setup.sh. Also modify the setup.sh script to handle environment variables so that http flask is not run as root.
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true 
+          DeviceIndex: 0
+          SubnetId: !Select [ 0, !GetAZs '' ]
+          GroupSet: 
+            - !Ref JobScraperSecurityGroup
+
+  # SSH Key Pair  
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: JobScraperKeyPair  
+
+  # Security Group 
+  JobScraperSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP/HTTPS 
+      VpcId: !Ref 'VPC' # TO:DO make this reference the default VPC and or just create a basic one
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: your-ip-address/32  # TO:DO make this an input variable
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  # Parameter to Store Private Key
+  PrivateKeyParameter:
+     Type: AWS::SSM::Parameter
+     Name: /jobscraper/privatekey  
+     Type: String
+     Value: !Ref EC2KeyPair
+
+  # Lambda Function that power cycles our EC2 instance once a day in order to get a new IP and ensure no zombie processes are on the loose 
+  PowerCycleLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler 
+      Runtime: python3.9 
+      Role: !GetAtt PowerCycleLambdaRole.Arn
+      Timeout: 180 
+      Code: 
+        ZipFile: |
+          import boto3
+          import time
+          ec2_client = boto3.client('ec2', region_name='us-east-1')
+          def handler(event, context):
+              instance_id = event['instanceId']
+              try:
+                  # Stop the instance
+                  ec2_client.stop_instances(InstanceIds=[instance_id])
+                  print('Stopping instance')
+                  # Wait for the instance to be fully stopped
+                  params = {'InstanceIds': [instance_id], 'IncludeAllInstances': True}
+                  while True:
+                      response = ec2_client.describe_instance_status(**params)
+                      if response['InstanceStatuses'] and response['InstanceStatuses'][0]['InstanceState']['Name'] == 'stopped':
+                          break
+                      else:
+                          print('Instance not yet stopped, waiting...')
+                          time.sleep(5)  # Wait 5 seconds
+                  print('Instance stopped')
+                  # Start the instance
+                  ec2_client.start_instances(InstanceIds=[instance_id])
+                  print('Instance started')
+              except Exception as error:
+                  print(error)
+
+  PowerCycleSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: cron(0 15 ? * MON-SUN *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PowerCycleLambda.Arn
+          Id: 'PowerCycleTarget'
+          Input: '{"instanceId": "!REF JobScraperInstance"}' # TO:DO make this reference the instance id of the JobScraperInstance correctly

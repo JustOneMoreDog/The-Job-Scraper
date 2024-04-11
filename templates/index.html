@@ -167,7 +167,7 @@
                           jobPosting.keywords,
                           jobPosting.search,
                           `<a href="${jobPosting.url}" target="_blank">Link</a>`,
-                          `<a href="#" class="view-content-link" data-content="${Handlebars.Utils.escapeExpression(jobPosting.content)}">View Content</a>`
+                          `<a href="#" class="view-content-link" data-content="${jobPosting.content}">View Content</a>`
                       ]).draw();
                   });
               }
@@ -181,7 +181,6 @@
   $(document).on('click', '.view-content-link', function(event) {
       event.preventDefault();
       const content = $(this).data('content');
-      const unescapedContent = Handlebars.Utils.escapeExpression(content);
       const newWindow = window.open('', '_blank');
       newWindow.document.body.innerHTML = content;
   });

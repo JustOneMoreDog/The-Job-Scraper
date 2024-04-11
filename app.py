@@ -17,9 +17,10 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-DEMO_STATE = True
+DEMO_STATE = False
 DEBUG_MODE = True
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+JOB_SCRAPER_RUNNING = False
 app = Flask(__name__)
 
 
@@ -43,10 +44,52 @@ class LogWatcher(FileSystemEventHandler):
 
 ### HELPER FUNCTIONS ###
         
-def run_job_scraper():
+def run_job_scraper(retry: bool = True) -> None:
+    global JOB_SCRAPER_RUNNING
+    JOB_SCRAPER_RUNNING = True
+    timeout = 14400  # 4 hours
+    scraper_had_issues = False
     virtual_env_path = os.path.abspath(os.path.join(WORKING_DIR, 'virtualenv/bin/python'))
     job_scraper_path = os.path.abspath(os.path.join(WORKING_DIR, 'job_scraper.py'))
-    subprocess.run([virtual_env_path, job_scraper_path])
+    job_scraper = subprocess.Popen([virtual_env_path, job_scraper_path])
+    start_time = time.time()
+    while time.time() - start_time < timeout and job_scraper.poll() is None:
+        time.sleep(300)
+    if job_scraper.poll() is None:
+        logging.info("Job scraper has been running for over 4 hours. Killing the process.")
+        scraper_had_issues = True
+    elapsed_time = time.gmtime(int(time.time()) - int(start_time))
+    formatted_runtime = time.strftime("%H:%M:%S", elapsed_time)
+    logging.info(f"Job scraper ran for {formatted_runtime}")
+    kill_the_parents_and_children(job_scraper.pid)
+    kill_chrome_processes()
+    logging.info("Killed the parent and child processes")
+    JOB_SCRAPER_RUNNING = False
+    if retry and scraper_had_issues:
+        logging.info("Sleeping for one hour and then retrying the job scraper one more time")
+        time.sleep(3600)
+        run_job_scraper(retry=False)
+    return    
+
+def kill_the_parents_and_children(parent_pid):
+    try:
+        parent = psutil.Process(parent_pid)
+        for child in parent.children(recursive=True):
+            try:
+                child.kill()
+            except (NoSuchProcess, AccessDenied, ZombieProcess):
+                pass
+        parent.kill()
+    except (NoSuchProcess, AccessDenied, ZombieProcess):
+        pass
+
+def kill_chrome_processes():
+    for proc in psutil.process_iter():
+        try:
+            if "chrome" in proc.name() or "undetected" in proc.name():
+                kill_the_parents_and_children(proc.pid)
+        except (NoSuchProcess, AccessDenied, ZombieProcess):
+            pass
 
 def close_observers(obs):
     for observer, observer_thread in obs:
@@ -88,23 +131,12 @@ def setup_logging():
     logs_directory = os.path.abspath(os.path.join(WORKING_DIR, "logs", "flask"))
     log_filename = datetime.now().strftime("%m_%d_%Y_%H_%M") + ".log"
     log_filepath = os.path.join(logs_directory, log_filename)
-    logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="w")
+    logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="x")
     logging.info("Logging has been setup for flask")
 
 def get_scraper_status():
-    is_running = False
-    for proc in psutil.process_iter():
-        try:
-            is_python = '/usr/bin/python3' in proc.cmdline()
-            is_job_scraper = 'job_scraper.py' in proc.cmdline()
-            if is_python and is_job_scraper:
-                is_running = True
-                break
-        except (NoSuchProcess, AccessDenied, ZombieProcess):
-            pass
-
     running_time = None
-    if is_running:
+    if JOB_SCRAPER_RUNNING:
         log_dir = 'scraper_logs'
         latest_log = max(os.listdir(log_dir), key=os.path.getctime)  
         log_timestamp = datetime.strptime(latest_log.split('.')[0], '%m_%d_%Y_%H_%M_%S')
@@ -114,7 +146,7 @@ def get_scraper_status():
     if next_run_time < datetime.now():
          next_run_time += timedelta(days=1)
     hours_until_next_run = (next_run_time - datetime.now()).seconds // 3600
-    return is_running, running_time, hours_until_next_run
+    return JOB_SCRAPER_RUNNING, running_time, hours_until_next_run
 
 def get_job_scrape_dates() -> list:
     # Find dates from job scrape files
@@ -193,7 +225,7 @@ def get_job_data():
 @app.route('/customizations')
 def customizations():
     customization_data = load_customizations()
-    return render_template('customizations.html', data=customization_data)
+    return render_template('customizations.html', data=customization_data, demo_state=DEMO_STATE)
 
 @app.route('/save_customizations', methods=['POST'])
 def save_customizations():
@@ -222,6 +254,7 @@ def statistics():
 observers = []
 try:
     observers = setup_watchdogs()
+    time.sleep(1)
     setup_logging()
     logging.info("Starting the background scheduler")
     executors = {
@@ -233,14 +266,15 @@ try:
     logging.info("Started")
     today = datetime.today()
     first_run = today + timedelta(days=1)
-    first_runtime = first_run.strftime("%y-%m-%d 03:00:00")
+    first_runtime = first_run.strftime("%y-%m-%d 01:00:00")
     first_runtime_obj = datetime.strptime(first_runtime, "%y-%m-%d %H:%M:%S")
     schedule.add_job(
         run_job_scraper,
         'interval',
         hours=24,
         start_date=first_runtime_obj,
-        end_date='2050-01-01 06:00:00'
+        end_date='2050-01-01 02:00:00',
+        id='job_scraper'
     )
     logging.info("Job added")
 except Exception as e:
@@ -249,7 +283,10 @@ except Exception as e:
 
 if __name__ == '__main__':
     try:
-        app.run(host="127.0.0.1", port=9090)
+        config = {}
+        with open('server_config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        app.run(host=config['flask_ip_address'], port=config['flask_port'], debug=config['flask_debug_mode'])
     except Exception as e:
         logging.exception(e)
     finally:

@@ -47,3 +47,6 @@
 !/logs/latest/.keep
 /scrapes/*
 !/scrapes/.keep
+tests.py
+test_data.txt
+server_config.yaml

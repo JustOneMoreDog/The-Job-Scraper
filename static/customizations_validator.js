@@ -7,29 +7,27 @@ function displayError(errorContainer, message) {
 // Helper function to verify that all strings in the array are English characters
 function verifyEnglishCharacters(array) {
     return array.every(function(str) {
-        return /^[A-Za-z\s-]+$/.test(str);
+        return /^[A-Za-z\s-,\+]+$/.test(str);
     });
 }
 
 // Function that gets the value of an input field using jQuery, verifies that there is a value, and if so splits the values out into an array
 function getInputValue(inputField, emptyAllowed) {
-    // console.log("Getting input value")
-    const inputValue = $(inputField).val();
-    // console.log(inputValue)
-    if (emptyAllowed && inputValue.length === 0) {
-        // console.log("Returning empty array")
-        return [];
+    const inputArray = [];
+    $(inputField).find('option:selected').each(function() {
+        const locationText = $(this).val().trim();
+        inputArray.push(locationText);
+    }).get();
+    console.log("Input array: '" + inputArray + "'")
+    if (emptyAllowed && inputArray.length === 0) {
+        return inputArray;
     }
-    if (!inputValue) {
-        // console.log("No input value")
+    if (inputArray.length === 0) {
         return null;
-    }
-    const inputArray = String(inputValue).split(',').map(function(str) { return str.trim(); });
+    }    
     if (!verifyEnglishCharacters(inputArray)) {
-        // console.log("not valid english characters")
         return null;
     }
-    // console.log("Returning input array: " + inputArray)
     return inputArray
 }
 
@@ -94,11 +92,13 @@ function validateCustomizationsForm(event) {
     const keywordWeights = getKeywordWeights(keywordWeightsErrorContainer);
     const minimum_good_results = parseInt($('#minimum_good_results_per_search_per_location').val(), 10);
     const includeHybridJobs = $('#include_hybrid_jobs').is(':checked');
-    const experienceLevels = {};
-    $('input[name^="experience_levels["]:checked').each(function() {
-        const levelName = $(this).attr('id');
-        experienceLevels[levelName] = true;
-    });
+    const experienceLevels = {
+        "Associate": true,
+        "Director": false,
+        "Entry level": true,
+        "Internship": false,
+        "Mid-Senior level": true
+    };
 
     if (!searchTerms) {
         displayError(searchTermErrorContainer, "Must provide at least one search term and all search terms must be English characters.");
@@ -137,12 +137,12 @@ function validateCustomizationsForm(event) {
     }
     console.log("All input is valid constructing our customizations JSON object")
     const customizations = {
-        searches: searchTerms,
-        locations: searchLocations,
-        excluded_locations: excludedLocations,
-        excluded_industries: excludedIndustries,
-        excluded_companies: excludedCompanies,
-        excluded_title_keywords: excludedJobTitles,
+        searches: [...new Set(searchTerms)],
+        locations: [...new Set(searchLocations)],
+        excluded_locations: [...new Set(excludedLocations)],
+        excluded_industries: [...new Set(excludedIndustries)],
+        excluded_companies: [...new Set(excludedCompanies)],
+        excluded_title_keywords: [...new Set(excludedJobTitles)],
         word_weights: keywordWeights,
         minimum_good_results_per_search_per_location: minimum_good_results,
         include_hybrid_jobs: includeHybridJobs,
