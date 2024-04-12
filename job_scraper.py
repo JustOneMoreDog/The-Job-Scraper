@@ -224,7 +224,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=max_retry_attempts,
+        stop=small_retry_attempts,
         reraise=True
     )
     def input_search_phrase_and_location(self, search: str, location: str) -> None:
@@ -232,24 +232,12 @@ class TheJobScraper:
         if attempt_number > 1:
             logging.info(f"Caught an exception on attempt {attempt_number} of inputting search and location so we are reloading the entire browser")
             self.start_a_fresh_chrome_driver()
-        # TO-DO: Break these out into three functions. They use to be their own functions but the retry blocks were not triggering properly so I pulled them back into this one function. Will fix some day (Narrator: He never fixed it)
-        keywords_input_box = self.get_web_element(By.ID, self.app_config['keywords_input_box'])
-        keywords_input_box.click()
-        keywords_input_box.clear()
-        keywords_input_box.send_keys(search)
-        location_input = self.get_web_element(By.ID, self.app_config['location_input_box'])
-        location_input.click()
-        location_input.clear()
-        location_input.send_keys(location + Keys.ENTER)
-        self.load_url()
-        phrases = [search, location]
-        current_url_string = urllib.parse.unquote_plus(self.driver.current_url)
-        self.log(f"Checking that the phrases, '[{','.join(phrases)}]', are in the URL, '{current_url_string}'")
-        for phrase in phrases:
-            if phrase not in current_url_string:
-                message = f"'{phrase}' not in the URL, '{current_url_string}'"
-                self.log(message)
-                raise UnexpectedBehaviorException(message)
+        # This is much easier than trying to deal with XPATH
+        base_url_string = "https://www.linkedin.com/jobs/search?"
+        search_params = f"keywords={search}&location={location}".replace(" ", "%20")
+        url_string = base_url_string + search_params
+        logging.info(f"Loading the URL: '{url_string}'")
+        self.load_url(url_string)
 
     @retry(
         retry=retry_if_any_exception,
@@ -258,7 +246,7 @@ class TheJobScraper:
         reraise=True
     )
     def filter_results_timespan(self, timespan_button_path: str) -> None:
-        attempt_number = self.input_search_phrase_and_location.retry.statistics['attempt_number']
+        attempt_number = self.filter_results_timespan.retry.statistics['attempt_number']
         if attempt_number > 1:
             logging.info(f"Caught an exception on attempt {attempt_number} of selecting timespan so we are reloading the entire browser and calling the input_search_phrase_and_location function")
             self.start_a_fresh_chrome_driver()
