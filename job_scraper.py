@@ -100,8 +100,8 @@ class TheJobScraper:
         self.log(f"Good {len(self.good_jobs)}, Bad {len(self.bad_jobs)}, Total {len(self.new_job_scrapes)}")
         self.log("Saving new job scrapes for the frontend to ingest")
         self.save_new_job_scrapes()
-        self.log("Finished post processing saving results")
-        self.save_job_scrape(self.good_jobs + self.bad_jobs, "all_jobs.json")
+        self.log("Adding to our new job scrapes to our main job scrape data file")
+        self.save_job_scrape(self.new_job_scrapes + self.all_jobs, "all_jobs.json")
 
     def save_new_job_scrapes(self) -> None:
         self.add_blank_spaces_to_good_jobs()
@@ -208,8 +208,8 @@ class TheJobScraper:
 
     def there_are_still_results(self) -> bool:
         try:
-            _ = self.get_web_element(By.CLASS_NAME, self.app_config['no_results'])
-            self.log("There are now no results being displayed")
+            _ = self.get_web_element(By.CLASS_NAME, self.app_config['no_results'], None, True, False)
+            self.log("There are no results being displayed for us")
             return False
         except NoSuchElementException:
             return True
@@ -230,13 +230,13 @@ class TheJobScraper:
     def input_search_phrase_and_location(self, search: str, location: str) -> None:
         attempt_number = self.input_search_phrase_and_location.retry.statistics['attempt_number']
         if attempt_number > 1:
-            logging.info(f"Caught an exception on attempt {attempt_number} of inputting search and location so we are reloading the entire browser")
+            self.log(f"Caught an exception on attempt {attempt_number} of inputting search and location so we are reloading the entire browser")
             self.start_a_fresh_chrome_driver()
         # This is much easier than trying to deal with XPATH
         base_url_string = "https://www.linkedin.com/jobs/search?"
         search_params = f"keywords={search}&location={location}".replace(" ", "%20")
         url_string = base_url_string + search_params
-        logging.info(f"Loading the URL: '{url_string}'")
+        self.log(f"Loading the URL: '{url_string}'")
         self.load_url(url_string)
 
     @retry(
@@ -248,7 +248,7 @@ class TheJobScraper:
     def filter_results_timespan(self, timespan_button_path: str) -> None:
         attempt_number = self.filter_results_timespan.retry.statistics['attempt_number']
         if attempt_number > 1:
-            logging.info(f"Caught an exception on attempt {attempt_number} of selecting timespan so we are reloading the entire browser and calling the input_search_phrase_and_location function")
+            self.log(f"Caught an exception on attempt {attempt_number} of selecting timespan so we are reloading the entire browser and calling the input_search_phrase_and_location function")
             self.start_a_fresh_chrome_driver()
             self.input_search_phrase_and_location(self.current_search, self.current_location)
         filters_section = self.get_web_element(By.XPATH, self.app_config['filters_section'])
@@ -320,7 +320,13 @@ class TheJobScraper:
         element_found = False
         for experience_level in target_experience_levels:
             try:
-                exp_level_checkbox = self.get_web_element(By.XPATH, f"//label[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{experience_level}')]")
+                exp_level_checkbox = self.get_web_element(
+                    By.XPATH, 
+                    f"//label[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{experience_level}')]",
+                    None,
+                    True,
+                    False
+                )
                 exp_level_checkbox.click()
                 element_found = True
             except NoSuchElementException:
@@ -370,14 +376,14 @@ class TheJobScraper:
             if page_height_script <= total_scrolled_height:
                 try:
                     more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
-                    logging.info("There is a more jobs button and we are going to press it")
+                    self.log("There is a more jobs button and we are going to press it")
                     more_jobs_button.click()
-                    logging.info("Pressed the more jobs button and returning True")
+                    self.log("Pressed the more jobs button and returning True")
                     return True
                 except (NoSuchElementException, ElementNotInteractableException):
                     self.log("At the bottom and do not see the more jobs button and or cannot interact with it")
                     return False
-        logging.info("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
+        self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
         return True
 
     def get_job_results_list(self) -> list:
@@ -456,9 +462,8 @@ class TheJobScraper:
         if not done_button:
             raise ElementNotFoundException("Could not find the correct done button")
         done_button.click()
-
-    def get_web_element(self, by: By, search_filter: str, element: WebElement = None, is_fatal: bool = True) -> WebElement:
-        self.annihilate_the_trackers()
+    
+    def get_web_element(self, by: By, search_filter: str, element: WebElement = None, is_fatal: bool = True, log_if_not_found: bool = True) -> WebElement:
         try:
             if element:
                 desired_web_element = element.find_element(by, search_filter)
@@ -466,7 +471,8 @@ class TheJobScraper:
                 desired_web_element = self.driver.find_element(by, search_filter)
             return desired_web_element
         except NoSuchElementException as e:
-            self.log(f"Could not find the '{search_filter}' web element via '{by}'")
+            if log_if_not_found:
+                self.log(f"Could not find the '{search_filter}' web element via '{by}'")
             if not is_fatal:
                 return None
             raise e
@@ -568,9 +574,6 @@ class TheJobScraper:
         all_jobs_path = self.app_config['jobs_filepath']
         if not os.path.exists(all_jobs_path):
             self.save_job_scrape([], all_jobs_path)
-        html_path = os.path.abspath(os.path.join(self.current_working_directory, self.app_config['html_folder']))
-        if not os.path.exists(html_path):
-            os.mkdir(html_path)
         all_jobs = self.load_json_data() or []
         all_jobs_backup_path = all_jobs_path + ".old"
         self.save_job_scrape(all_jobs, all_jobs_backup_path)
@@ -627,6 +630,9 @@ class JobPosting:
 
     def log(self, message):
         self.job_scraper.log(message)
+    
+    def get_web_element(self, by: By, search_filter: str, element: WebElement = None, is_fatal: bool = True, log_if_not_found: bool = True) -> WebElement:
+        return self.job_scraper.get_web_element(by, search_filter, element, is_fatal, log_if_not_found)
 
     def get_job_posting_json_data(self) -> dict:
         return {
@@ -655,6 +661,9 @@ class JobPosting:
         newly_found_job_url = split_newly_found_job_url[1].lower()
         self.log(f"Checking if the job posting URL, '{newly_found_job_url}', has been previously scraped")
         for job in (self.newly_scraped_jobs + self.previously_scraped_jobs):
+            self.log(f"Previously found job url: '{job['url']}'")
+            if not job['url']:
+                continue
             previously_found_job_url = job['url'].split("/view/")[1].lower()
             duplicate_job_posting_url = previously_found_job_url == newly_found_job_url
             if duplicate_job_posting_url:
@@ -872,17 +881,6 @@ class JobPosting:
             self.log(f"'{self.title}' at '{self.company}' triggered the follow error\n{e}")
             self.refresh_element_selection()
             # Now that we have refreshed our posting_element we can have the retry class start the function over
-            raise e
-
-    def get_web_element(self, by: By, search_filter: str, element: WebElement = None) -> WebElement:
-        try:
-            if element:
-                desired_web_element = element.find_element(by, search_filter)
-            else:
-                desired_web_element = self.driver.find_element(by, search_filter)
-            return desired_web_element
-        except NoSuchElementException as e:
-            self.log(f"Could not find the '{search_filter}' web element via '{by}'")
             raise e
 
     def get_job_posting_keywords_and_rating(self) -> None:
