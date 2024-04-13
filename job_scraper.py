@@ -76,7 +76,6 @@ class TheJobScraper:
         self.new_job_scrapes = []
         self.good_jobs = []
         self.bad_jobs = []
-        self.html_output_directory = ""
         self.current_search = ""
         self.current_location = ""
         self.current_timespan = ""
