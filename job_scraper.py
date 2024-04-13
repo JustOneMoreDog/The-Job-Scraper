@@ -660,7 +660,6 @@ class JobPosting:
         newly_found_job_url = split_newly_found_job_url[1].lower()
         self.log(f"Checking if the job posting URL, '{newly_found_job_url}', has been previously scraped")
         for job in (self.newly_scraped_jobs + self.previously_scraped_jobs):
-            self.log(f"Previously found job url: '{job['url']}'")
             if not job['url']:
                 continue
             previously_found_job_url = job['url'].split("/view/")[1].lower()
