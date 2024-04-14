@@ -6,13 +6,14 @@ import threading
 import time
 from datetime import datetime, timedelta
 from threading import Thread
+from ansi2html import Ansi2HTMLConverter
 
 import psutil
-from psutil import NoSuchProcess, AccessDenied, ZombieProcess
 import yaml
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, render_template, request
+from psutil import AccessDenied, NoSuchProcess, ZombieProcess
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
@@ -131,7 +132,11 @@ def setup_logging():
     logs_directory = os.path.abspath(os.path.join(WORKING_DIR, "logs", "flask"))
     log_filename = datetime.now().strftime("%m_%d_%Y_%H_%M") + ".log"
     log_filepath = os.path.join(logs_directory, log_filename)
-    logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="x")
+    if os.path.exists(log_filepath):
+        filemode = "a"
+    else:
+        filemode = "x"
+    logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode=filemode)
     logging.info("Logging has been setup for flask")
 
 def get_scraper_status():
@@ -240,6 +245,27 @@ def save_customizations():
     with open('customizations.yaml', 'w') as f:
         yaml.dump(new_customizations_data, f)
     return jsonify({'status': 'success'})
+
+@app.route('/logs/latest/<path:filename>', methods=['GET'])
+def get_latest_log(filename):
+    # TO-DO: Add support for screenshot.png
+    if request.method != 'GET':
+        return jsonify({'error': 'Invalid request method'})
+    if not filename:
+        return jsonify({'error': 'Log name required'})
+    log_dir = os.path.join(WORKING_DIR, "logs/latest")
+    match filename:
+        case 'flask.log':
+            latest_log_path = os.path.join(log_dir, 'flask.log')
+        case 'scraper.log':
+            latest_log_path = os.path.join(log_dir, 'scraper.log')
+        case _:
+            return jsonify({'error': 'Unsupported log file'})
+    with open(latest_log_path, 'r') as f:
+        data = f.read()
+    ansi_converter = Ansi2HTMLConverter(font_size="x-large")
+    html_data = ansi_converter.convert(data)
+    return html_data
 
 @app.route('/applications')
 def applications():
