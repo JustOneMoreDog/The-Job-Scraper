@@ -23,6 +23,8 @@ from selenium.common import (
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebElement
+from selenium.webdriver.support.ui import WebDriverWait 
+from selenium.webdriver.support import expected_conditions as EC
 from tenacity import (
     RetryError,
     retry,
@@ -381,9 +383,33 @@ class TheJobScraper:
                     return True
                 except (NoSuchElementException, ElementNotInteractableException):
                     self.log("At the bottom and do not see the more jobs button and or cannot interact with it")
-                    return False
+                    return self.test_new_see_more_jobs_button_xpath()
         self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
         return True
+
+    def test_new_see_more_jobs_button_xpath(self) -> bool:
+        try:
+            button = WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='infinite-scroller__show-more-button infinite-scroller__show-more-button--visible']")))
+            button.click()
+            logging.info("Option A for new xpath worked")
+            return True
+        except Exception as e:
+            pass
+        try:
+            button = WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='See more jobs']")))
+            button.click()
+            logging.info("Option B for new xpath worked")
+            return True
+        except Exception as e:
+            pass
+        try:
+            button = WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'See more jobs')]")))
+            button.click()
+            logging.info("Option C for new xpath worked")
+            return True
+        except Exception as e:
+            pass
+        return False
 
     def get_job_results_list(self) -> list:
         all_job_postings_section = self.get_web_element(By.XPATH, self.app_config['job_results_list'])
