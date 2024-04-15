@@ -375,37 +375,51 @@ class TheJobScraper:
             page_height_script = self.driver.execute_script(self.app_config['page_height_script']) - 1
             total_scrolled_height = self.driver.execute_script(self.app_config['total_scrolled_height'])
             if page_height_script <= total_scrolled_height:
+                button_was_displayed_or_enabled = False
                 try:
                     more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
                     self.log("There is a more jobs button and we are going to press it")
+                    self.log(f"The more jobs button is displayed, '{more_jobs_button.is_displayed}', and is enabled, '{more_jobs_button.is_enabled}'")
+                    button_was_displayed_or_enabled = more_jobs_button.is_displayed or more_jobs_button.is_enabled
                     more_jobs_button.click()
                     self.log("Pressed the more jobs button and returning True")
                     return True
                 except (NoSuchElementException, ElementNotInteractableException):
                     self.log("At the bottom and do not see the more jobs button and or cannot interact with it")
+                    if button_was_displayed_or_enabled:
+                        self.log("Saving devel screenshot")
+                        filepath = os.path.join(self.current_working_directory, str(int(time.time())) + "_more_jobs_button.png")
+                    self.driver.save_screenshot(filepath)
                     return self.test_new_see_more_jobs_button_xpath()
         self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
         return True
 
     def test_new_see_more_jobs_button_xpath(self) -> bool:
         try:
-            button = WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='infinite-scroller__show-more-button infinite-scroller__show-more-button--visible']")))
+            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='infinite-scroller__show-more-button infinite-scroller__show-more-button--visible']")))
             button.click()
             logging.info("Option A for new xpath worked")
             return True
         except Exception as e:
             pass
         try:
-            button = WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='See more jobs']")))
+            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='See more jobs']")))
             button.click()
             logging.info("Option B for new xpath worked")
             return True
         except Exception as e:
             pass
         try:
-            button = WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'See more jobs')]")))
+            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'See more jobs')]")))
             button.click()
             logging.info("Option C for new xpath worked")
+            return True
+        except Exception as e:
+            pass
+        try:
+            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'See more jobs')]")))
+            button.click()
+            logging.info("Option D for new xpath worked")
             return True
         except Exception as e:
             pass
