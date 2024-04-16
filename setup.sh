@@ -7,8 +7,8 @@ sudo add-apt-repository ppa:deadsnakes/ppa -y
 sudo apt update -y
 sudo apt install git build-essential python3.10 python3.10-venv git tzdata wget unzip libx11-dev xorg-dev libgl1-mesa-dev libglu1-mesa-dev  -y
 
-echo "Grabing the latest version of the job scraper"
-git clone -b devel https://github.com/JustOneMoreDog/The-Job-Scraper.git
+echo "Grabing the latest stable version of the job scraper"
+git clone https://github.com/JustOneMoreDog/The-Job-Scraper.git
 
 echo "Getting chromedriver and Chrome installed"
 version=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
