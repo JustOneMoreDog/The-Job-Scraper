@@ -11,6 +11,7 @@ from time import sleep
 from urllib.parse import parse_qs, urlparse
 from html import escape
 import us
+import math
 
 import undetected_chromedriver as uc
 import yaml
@@ -40,8 +41,9 @@ from scraper_utils import js_conditions
 debug = False
 minimum_jitter = int(random.uniform(1, 3))
 maximum_jitter = int(random.uniform(8, 10))
-exponential_jitter_wait = wait_exponential_jitter(5, 7200, 2, random.uniform(minimum_jitter, maximum_jitter))
-small_retry_attempts = stop_after_attempt(3)
+exponential_jitter_wait = wait_exponential_jitter(5, 7200, 3, random.uniform(minimum_jitter, maximum_jitter))
+small_retry_attempts = stop_after_attempt(2)
+medium_retry_attempts = stop_after_attempt(4)
 max_retry_attempts = stop_after_attempt(10)
 retry_if_any_exception = retry_if_exception_type(Exception)
 
@@ -220,12 +222,11 @@ class TheJobScraper:
             self.driver.quit()
             time.sleep(random.uniform(minimum_jitter, maximum_jitter))
         self.driver = self.initialize_chrome_driver()
-        self.load_url(self.app_config['starting_url'])
 
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=True
     )
     def input_search_phrase_and_location(self, search: str, location: str) -> None:
@@ -243,7 +244,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=True
     )
     def filter_results_timespan(self, timespan_button_path: str) -> None:
@@ -276,7 +277,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=False
     )
     def select_only_remote_jobs(self) -> None:
@@ -302,7 +303,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=False
     )
     def select_experience_levels(self) -> None:
@@ -375,55 +376,48 @@ class TheJobScraper:
             page_height_script = self.driver.execute_script(self.app_config['page_height_script']) - 1
             total_scrolled_height = self.driver.execute_script(self.app_config['total_scrolled_height'])
             if page_height_script <= total_scrolled_height:
-                button_was_displayed_or_enabled = False
                 try:
-                    more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
-                    self.log("There is a more jobs button and we are going to press it")
-                    self.log(f"The more jobs button is displayed, '{more_jobs_button.is_displayed}', and is enabled, '{more_jobs_button.is_enabled}'")
-                    button_was_displayed_or_enabled = more_jobs_button.is_displayed or more_jobs_button.is_enabled
-                    more_jobs_button.click()
-                    self.log("Pressed the more jobs button and returning True")
-                    return True
-                except (NoSuchElementException, ElementNotInteractableException):
-                    self.log("At the bottom and do not see the more jobs button and or cannot interact with it")
-                    if button_was_displayed_or_enabled:
-                        self.log("Saving devel screenshot")
-                        filepath = os.path.join(self.current_working_directory, str(int(time.time())) + "_more_jobs_button.png")
-                    self.driver.save_screenshot(filepath)
-                    return self.test_new_see_more_jobs_button_xpath()
+                    return self.find_and_press_see_more_jobs_button()
+                except RetryError:
+                    return False
         self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
         return True
-
-    def test_new_see_more_jobs_button_xpath(self) -> bool:
-        try:
-            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@class='infinite-scroller__show-more-button infinite-scroller__show-more-button--visible']")))
-            button.click()
-            logging.info("Option A for new xpath worked")
-            return True
-        except Exception as e:
-            pass
-        try:
-            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='See more jobs']")))
-            button.click()
-            logging.info("Option B for new xpath worked")
-            return True
-        except Exception as e:
-            pass
-        try:
-            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'See more jobs')]")))
-            button.click()
-            logging.info("Option C for new xpath worked")
-            return True
-        except Exception as e:
-            pass
-        try:
-            button = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.XPATH, "//button[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'See more jobs')]")))
-            button.click()
-            logging.info("Option D for new xpath worked")
-            return True
-        except Exception as e:
-            pass
-        return False
+    
+    @retry(
+        retry=retry_if_any_exception,
+        wait=exponential_jitter_wait,
+        stop=small_retry_attempts,
+        reraise=False
+    )
+    def find_and_press_see_more_jobs_button(self) -> bool:
+        # This hurt me...
+        attempt_number = self.find_and_press_see_more_jobs_button.retry.statistics['attempt_number']
+        self.log(f"This is attempt {attempt_number} to find and press the see more jobs button")
+        self.jiggle_up_and_down()
+        more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
+        self.log("Found the more jobs button. Clicking it now.")
+        time.sleep(random.uniform(1, 2))
+        # ...emotionally
+        for i in range(3):
+            try:
+                more_jobs_button.click()
+                time.sleep(random.random())
+            except Exception as e:
+                if i == 2:
+                    raise e
+                pass
+        self.log("More jobs button has been pressed.")
+        return True
+        
+    def jiggle_up_and_down(self) -> None:
+        self.log("Jiggling the page up and down for reasons I cannot even begin to explain")
+        random_jiggles = math.ceil(random.uniform(1, 3))
+        for _ in range(random_jiggles):
+            self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_UP)
+            time.sleep(random.uniform(1, 2))
+        for _ in range(random_jiggles * 3):
+            self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+        time.sleep(random.uniform(1, 2))
 
     def get_job_results_list(self) -> list:
         all_job_postings_section = self.get_web_element(By.XPATH, self.app_config['job_results_list'])
@@ -848,7 +842,7 @@ class JobPosting:
     @retry(
         retry=retry_if_exception_type((TooManyRequestsException, NoSuchElementException)),
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=False
     )
     def request_job_posting(self) -> None:

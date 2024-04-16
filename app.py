@@ -142,7 +142,7 @@ def setup_logging():
 def get_scraper_status():
     running_time = None
     if JOB_SCRAPER_RUNNING:
-        log_dir = 'scraper_logs'
+        log_dir = os.path.abspath(os.path.join(WORKING_DIR, 'logs/scraper'))
         latest_log = max(os.listdir(log_dir), key=os.path.getctime)  
         log_timestamp = datetime.strptime(latest_log.split('.')[0], '%m_%d_%Y_%H_%M_%S')
         running_time = datetime.now() - log_timestamp
