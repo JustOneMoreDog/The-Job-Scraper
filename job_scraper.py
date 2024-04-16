@@ -401,24 +401,6 @@ class TheJobScraper:
         return
 
     def scroll_to_the_infinite_bottom(self) -> bool:
-        '''
-        TO-DO: Make this more robust by...
-        When the "See more jobs" button is visible it will have the following tag
-        <button aria-label="See more jobs" class="infinite-scroller__show-more-button infinite-scroller__show-more-button--visible" data-tracking-control-name="infinite-scroller_show-more">
-        When it is not visible it will just be
-        <button aria-label="See more jobs" class="infinite-scroller__show-more-button" data-tracking-control-name="infinite-scroller_show-more">
-        Note the, infinite-scroller__show-more-button--visible, in the class
-        We should adjust our logic so that if the jiggling does not yield success, and, the button is missing that class, then we check the following div
-        This div controls if the "You've viewed all jobs for this search" is visible
-        When it is visible
-        <div class="px-1.5 flex inline-notification text-color-signal-positive see-more-jobs__viewed-all" role="alert" type="success">
-        When it is not
-        <div class="px-1.5 flex inline-notification hidden text-color-signal-positive see-more-jobs__viewed-all" role="alert" type="success">
-        Note the "hidden" in the class
-        So our full logic is
-        if (the find_and_press_see_more_jobs_button fails) and (the button is not visible) and (viewed all jobs for search is visible):
-        return False
-        '''
         results_list = self.get_job_results_list()
         self.log(f"Scrolling to the infinite bottom with {len(results_list)} job postings loaded on the screen")
         # We do not use while true here as a safety precaution against never ending scrolling
@@ -429,8 +411,10 @@ class TheJobScraper:
             total_scrolled_height = self.driver.execute_script(self.app_config['total_scrolled_height'])
             if page_height_script <= total_scrolled_height:
                 try:
-                    return self.find_and_press_see_more_jobs_button(len(results_list))
+                    self.find_and_press_see_more_jobs_button(len(results_list))
+                    return True
                 except RetryError:
+                    self.log("Ran out of attempts to find and press the see more jobs button")
                     return False
         self.log("We have scrolled to the bottom 25 times and have not found the more jobs button so we are breaking out")
         return True
@@ -441,28 +425,36 @@ class TheJobScraper:
         stop=small_retry_attempts,
         reraise=False
     )
-    def find_and_press_see_more_jobs_button(self, previously_loaded_jobs: int) -> bool:
+    def find_and_press_see_more_jobs_button(self, previously_loaded_jobs: int) -> None:
         # This hurt me...
         attempt_number = self.find_and_press_see_more_jobs_button.retry.statistics['attempt_number']
         self.log(f"This is attempt {attempt_number} to find and press the see more jobs button")
-        self.jiggle_up_and_down()
-        more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
-        self.log("Found the more jobs button. Clicking it now.")
+        more_jobs_button = self.get_see_more_jobs_button()
+        self.log("See more jobs button exists and is displayed. Clicking it now.")
         sleep(random.uniform(1, 2))
-        # ...emotionally
-        for i in range(3):
-            try:
-                more_jobs_button.click()
-                sleep(random.uniform(2, 3))
-                if len(self.get_job_results_list()) > previously_loaded_jobs:
-                    self.log("Successfully loaded more jobs onto the screen after clicking on the button")
-                    return True
-            except Exception as e:
-                if i == 2:
-                    self.save_debug_data("more_jobs_button_press", True, True)
-                    raise e
-                pass
-        
+        self.click_see_more_jobs_button(more_jobs_button, previously_loaded_jobs)
+
+    def get_see_more_jobs_button(self) -> WebElement:
+        more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'], None, False, True)
+        if not more_jobs_button:
+            message = "Could not find the see more jobs button which is unexpected and may mean that the xpath has changed"
+            self.log(message)
+            raise UnexpectedBehaviorException(message)
+        if not more_jobs_button.is_displayed():
+            for i in range(3):
+                self.log(f"Attempt {i} to get the see more jobs button to display")
+                if self.reached_end_of_results():
+                    self.log("We have viewed all jobs for this search")
+                    return None
+                self.jiggle_up_and_down()
+                more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
+                if more_jobs_button.is_displayed():
+                    return more_jobs_button
+            message = "We were unable to get the see more jobs button to display"
+            self.log(message)
+            raise ElementNotInteractableException(message)
+        return more_jobs_button
+    
     def jiggle_up_and_down(self) -> None:
         self.log("Jiggling the page up and down for reasons I cannot even begin to explain")
         random_jiggles = math.ceil(random.uniform(1, 3))
@@ -472,6 +464,26 @@ class TheJobScraper:
         for _ in range(random_jiggles * 3):
             self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
         sleep(random.uniform(1, 2))
+    
+    def reached_end_of_results(self) -> bool:
+        end_notification = self.get_web_element(By.CLASS_NAME, self.app_config['end_of_results'], None, False, True)
+        if end_notification and end_notification.is_displayed():
+            self.save_debug_data("reached_end_of_results", True, True)
+            return True
+        return False
+
+    def click_see_more_jobs_button(self, more_jobs_button: WebElement, previously_loaded_jobs: int) -> None:
+        for i in range(3):
+            try:
+                more_jobs_button.click()
+                sleep(random.uniform(2, 3))
+                if len(self.get_job_results_list()) > previously_loaded_jobs:
+                    self.log("Successfully loaded more jobs onto the screen after clicking on the button")
+            except Exception as e:
+                if i == 2:
+                    self.save_debug_data("more_jobs_button_press", True, True)
+                    raise e
+                pass
 
     def get_job_results_list(self) -> list:
         all_job_postings_section = self.get_web_element(By.XPATH, self.app_config['job_results_list'])
