@@ -109,7 +109,7 @@ def setup_watchdogs() -> list:
     observers = []
     for dir in os.listdir("logs"):
         log_directory = os.path.abspath(os.path.join(WORKING_DIR, "logs", dir))
-        if not os.path.isdir(log_directory) or dir == "latest":
+        if not os.path.isdir(log_directory) or dir == "latest" or dir == "debug_data":
             continue
         extension = ".log"
         if dir == "screenshots":

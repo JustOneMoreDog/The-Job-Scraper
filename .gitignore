@@ -27,7 +27,7 @@
 !/logs/screenshots/.keep
 /logs/latest/*
 !/logs/latest/.keep
+/logs/debug_data/*
+!/logs/debug_data/.keep
 /scrapes/*
 !/scrapes/.keep
-tests.py
-test_data.txt

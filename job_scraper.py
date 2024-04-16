@@ -220,7 +220,7 @@ class TheJobScraper:
     def start_a_fresh_chrome_driver(self) -> None:
         if self.driver:
             self.driver.quit()
-            time.sleep(random.uniform(minimum_jitter, maximum_jitter))
+            sleep(random.uniform(minimum_jitter, maximum_jitter))
         self.driver = self.initialize_chrome_driver()
 
     @retry(
@@ -366,6 +366,12 @@ class TheJobScraper:
             previous_index = len(results_list)
             if not more_jobs_to_load or (previous_index == len(results_list)):
                 self.log("There are no more jobs to load")
+                filepath = str(int(time.time())) + "_more_jobs"
+                html_filepath = os.path.join(self.current_working_directory, "logs/debug_data", filepath + ".html")
+                png_filepath = os.path.join(self.current_working_directory, "logs/debug_data", filepath + ".png")
+                with open(html_filepath, "w") as f:
+                    f.write(self.driver.page_source())
+                self.driver.save_screenshot(filename=png_filepath)
                 break
 
     def scroll_to_the_infinite_bottom(self) -> bool:
@@ -396,12 +402,12 @@ class TheJobScraper:
         self.jiggle_up_and_down()
         more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
         self.log("Found the more jobs button. Clicking it now.")
-        time.sleep(random.uniform(1, 2))
+        sleep(random.uniform(1, 2))
         # ...emotionally
         for i in range(3):
             try:
                 more_jobs_button.click()
-                time.sleep(random.random())
+                sleep(random.uniform(1, 2))
             except Exception as e:
                 if i == 2:
                     raise e
@@ -414,10 +420,10 @@ class TheJobScraper:
         random_jiggles = math.ceil(random.uniform(1, 3))
         for _ in range(random_jiggles):
             self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_UP)
-            time.sleep(random.uniform(1, 2))
+            sleep(random.uniform(1, 2))
         for _ in range(random_jiggles * 3):
             self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
-        time.sleep(random.uniform(1, 2))
+        sleep(random.uniform(1, 2))
 
     def get_job_results_list(self) -> list:
         all_job_postings_section = self.get_web_element(By.XPATH, self.app_config['job_results_list'])
@@ -561,15 +567,24 @@ class TheJobScraper:
         reraise=True
     )
     def check_for_http_too_many_requests(self) -> None:
+        def save_page_source():
+            filename = str(int(time.time())) + "_429.html"
+            filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename)
+            with open(filepath, "w") as f:
+                f.write(self.driver.page_source())    
         attempt_number = self.check_for_http_too_many_requests.retry.statistics['attempt_number']
         if attempt_number > 1:
+            self.log("Refreshing page as we got hit with a 429")
+            sleep(random.uniform(minimum_jitter, maximum_jitter))
             self.driver.refresh()
             self.wait_for_page_to_load()
         http_429_check = self.driver.find_elements(By.XPATH, self.app_config['http_429_xpath'])
         if http_429_check:
+            save_page_source()
             raise TooManyRequestsException("We have been hit with HTTP 429 and so we need to sleep")
         network_down_message = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Your LinkedIn Network Will Be Back Soon')]")
         if network_down_message:
+            save_page_source()
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def setup_logging(self) -> None:
