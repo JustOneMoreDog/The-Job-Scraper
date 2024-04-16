@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 from html import escape
 import us
 import math
+import subprocess
 
 import undetected_chromedriver as uc
 import yaml
@@ -38,7 +39,6 @@ from undetected_chromedriver import Chrome, ChromeOptions
 from scraper_utils import js_conditions
 
 # Global configuration for our exponential backoff
-debug = False
 minimum_jitter = int(random.uniform(1, 3))
 maximum_jitter = int(random.uniform(8, 10))
 exponential_jitter_wait = wait_exponential_jitter(5, 7200, 3, random.uniform(minimum_jitter, maximum_jitter))
@@ -83,6 +83,7 @@ class TheJobScraper:
         self.current_search = ""
         self.current_location = ""
         self.current_timespan = ""
+        self.debug_mode = self.set_debug_mode()
         # For each search in each location we will break out if we go over the threshold that
         # is set by the customizations['minimum_good_results_per_search_per_location']
         # This helps lower the amount of work that needs to happen
@@ -90,6 +91,13 @@ class TheJobScraper:
         self.log("Successfully initialized the job scraper")
         self.log(f"\n-----\nApplication Configuration:\n{self.app_config}\n-----")
         self.log(f"\n-----\nSearch Customizations:\n{self.customizations}\n-----")
+    
+    def set_debug_mode(self):
+        try:
+            output = subprocess.check_output(['git', 'symbolic-ref', '--short', 'HEAD']).decode('utf-8').strip()
+            return output == 'devel'
+        except subprocess.CalledProcessError:
+            return False
 
     def log(self, message: str) -> None:
         prefix = f"{self.current_search}:{self.current_location}:{self.current_timespan}: "
@@ -366,16 +374,13 @@ class TheJobScraper:
             previous_index = len(results_list)
             if not more_jobs_to_load or (previous_index == len(results_list)):
                 self.log("There are no more jobs to load")
-                filepath = str(int(time.time())) + "_more_jobs"
-                html_filepath = os.path.join(self.current_working_directory, "logs/debug_data", filepath + ".html")
-                png_filepath = os.path.join(self.current_working_directory, "logs/debug_data", filepath + ".png")
-                with open(html_filepath, "w") as f:
-                    f.write(self.driver.page_source())
-                self.driver.save_screenshot(filename=png_filepath)
+                self.save_debug_data("more_jobs", True, True)
                 break
 
     def scroll_to_the_infinite_bottom(self) -> bool:
         # We do not use while true as a safety precaution against never ending scrolling
+        results_list = self.get_job_results_list()
+        self.log(f"Scrolling to the infinite bottom with {len(results_list)} job postings loaded on the screen")
         for _ in range(0, 50):
             self.driver.execute_script(self.app_config['scroll_to_bottom_script'])
             self.load_url()
@@ -383,7 +388,7 @@ class TheJobScraper:
             total_scrolled_height = self.driver.execute_script(self.app_config['total_scrolled_height'])
             if page_height_script <= total_scrolled_height:
                 try:
-                    return self.find_and_press_see_more_jobs_button()
+                    return self.find_and_press_see_more_jobs_button(len(results_list))
                 except RetryError:
                     return False
         self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
@@ -395,7 +400,7 @@ class TheJobScraper:
         stop=small_retry_attempts,
         reraise=False
     )
-    def find_and_press_see_more_jobs_button(self) -> bool:
+    def find_and_press_see_more_jobs_button(self, previously_loaded_jobs: int) -> bool:
         # This hurt me...
         attempt_number = self.find_and_press_see_more_jobs_button.retry.statistics['attempt_number']
         self.log(f"This is attempt {attempt_number} to find and press the see more jobs button")
@@ -407,9 +412,13 @@ class TheJobScraper:
         for i in range(3):
             try:
                 more_jobs_button.click()
-                sleep(random.uniform(1, 2))
+                sleep(random.uniform(2, 3))
+                if len(self.get_job_results_list()) > previously_loaded_jobs:
+                    self.log("Successfully loaded more jobs onto the screen")
+                    break
             except Exception as e:
                 if i == 2:
+                    self.save_debug_data("more_jobs_button_press", True, True)
                     raise e
                 pass
         self.log("More jobs button has been pressed.")
@@ -478,14 +487,22 @@ class TheJobScraper:
     def is_page_sign_in_form(self) -> bool:
         try:
             _ = self.get_web_element(By.XPATH, self.app_config['sign_in_form'])
-            # temp debugging
-            self.driver.save_screenshot("sign_in_form.png")
-            # saving beautiful soup of page to file for debugging
-            with open("sign_in_form.html", "w") as f:
-                f.write(self.driver.page_source)
+            self.save_debug_data("sign_in_form", True, True)
             return True
         except NoSuchElementException:
             return False
+    
+    def save_debug_data(self, name: str, source: bool, screenshot: bool) -> None:
+        if not self.debug_mode:
+            return
+        filename = str(int(time.time())) + "_" + name
+        if source:
+            filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename + ".html")
+            with open(filepath, "w") as f:
+                f.write(self.driver.page_source)
+        if screenshot:
+            filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename + ".png")
+            self.driver.save_screenshot(filename=filepath)
 
     def find_and_press_done_button(self) -> None:
         done_buttons = self.driver.find_elements(By.XPATH, self.app_config['done_button'])
@@ -567,11 +584,6 @@ class TheJobScraper:
         reraise=True
     )
     def check_for_http_too_many_requests(self) -> None:
-        def save_page_source():
-            filename = str(int(time.time())) + "_429.html"
-            filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename)
-            with open(filepath, "w") as f:
-                f.write(self.driver.page_source())    
         attempt_number = self.check_for_http_too_many_requests.retry.statistics['attempt_number']
         if attempt_number > 1:
             self.log("Refreshing page as we got hit with a 429")
@@ -580,11 +592,11 @@ class TheJobScraper:
             self.wait_for_page_to_load()
         http_429_check = self.driver.find_elements(By.XPATH, self.app_config['http_429_xpath'])
         if http_429_check:
-            save_page_source()
+            self.save_debug_data("429", True, True)
             raise TooManyRequestsException("We have been hit with HTTP 429 and so we need to sleep")
         network_down_message = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Your LinkedIn Network Will Be Back Soon')]")
         if network_down_message:
-            save_page_source()
+            self.save_debug_data("429", True, True)
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def setup_logging(self) -> None:
