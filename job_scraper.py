@@ -358,13 +358,14 @@ class TheJobScraper:
     def get_all_job_postings(self) -> None:
         previous_index = 0
         iteration = 0
-        while self.new_good_job_scrapes_for_search < self.customizations['minimum_good_results_per_search_per_location']:
-            self.annihilate_the_trackers()
+        for _ in range(0, 25):
+            if self.new_good_job_scrapes_for_search >= self.customizations['minimum_good_results_per_search_per_location']:
+                return
             iteration += 1
             if iteration > 1:
                 if self.is_page_sign_in_form():
                     self.log("get_all_job_postings: We have been redirected to the sign in form and we currently do not have a way around this yet")
-                    break
+                    return
             self.log(f"We are on iteration {iteration} with {self.new_good_job_scrapes_for_search} good posts")
             more_jobs_to_load = self.scroll_to_the_infinite_bottom()
             results_list = self.get_job_results_list()
@@ -372,16 +373,18 @@ class TheJobScraper:
             self.get_all_job_posting_objects(previous_index)
             self.log(f"Updating the starting point from {previous_index} to {len(results_list)}")
             previous_index = len(results_list)
-            if not more_jobs_to_load or (previous_index == len(results_list)):
+            if not more_jobs_to_load:
                 self.log("There are no more jobs to load")
                 self.save_debug_data("more_jobs", True, True)
-                break
+                return
+        self.log("We have reached our limited of 25 iterations of getting all job postings")
+        return
 
     def scroll_to_the_infinite_bottom(self) -> bool:
-        # We do not use while true as a safety precaution against never ending scrolling
         results_list = self.get_job_results_list()
         self.log(f"Scrolling to the infinite bottom with {len(results_list)} job postings loaded on the screen")
-        for _ in range(0, 50):
+        # We do not use while true here as a safety precaution against never ending scrolling
+        for _ in range(0, 25):
             self.driver.execute_script(self.app_config['scroll_to_bottom_script'])
             self.load_url()
             page_height_script = self.driver.execute_script(self.app_config['page_height_script']) - 1
@@ -391,7 +394,7 @@ class TheJobScraper:
                     return self.find_and_press_see_more_jobs_button(len(results_list))
                 except RetryError:
                     return False
-        self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
+        self.log("We have scrolled to the bottom 25 times and have not found the more jobs button so we are breaking out")
         return True
     
     @retry(
@@ -414,15 +417,13 @@ class TheJobScraper:
                 more_jobs_button.click()
                 sleep(random.uniform(2, 3))
                 if len(self.get_job_results_list()) > previously_loaded_jobs:
-                    self.log("Successfully loaded more jobs onto the screen")
-                    break
+                    self.log("Successfully loaded more jobs onto the screen after clicking on the button")
+                    return True
             except Exception as e:
                 if i == 2:
                     self.save_debug_data("more_jobs_button_press", True, True)
                     raise e
                 pass
-        self.log("More jobs button has been pressed.")
-        return True
         
     def jiggle_up_and_down(self) -> None:
         self.log("Jiggling the page up and down for reasons I cannot even begin to explain")
@@ -448,7 +449,6 @@ class TheJobScraper:
         excluded_jobs = 0
         valid_jobs = 0
         for job_posting_number, job_posting in enumerate(all_job_postings[starting_index:]):
-            self.annihilate_the_trackers()
             job_posting_object = JobPosting(job_posting, job_posting_number, self)
             try:
                 if job_posting_object.is_a_duplicate():
@@ -475,7 +475,6 @@ class TheJobScraper:
                 self.new_good_job_scrapes_for_search += 1
                 valid_jobs += 1
             except Exception as e:
-                self.annihilate_the_trackers()
                 self.log(f"Job posting {job_posting_number} failed with error: {e}")
                 if self.is_page_sign_in_form():
                     self.log("get_all_job_posting_objects: We have been redirected to the sign in form and we currently do not have a way around this yet")
@@ -531,18 +530,10 @@ class TheJobScraper:
                 self.log(f"Could not find the '{search_filter}' web element via '{by}'")
             if not is_fatal:
                 return None
-            raise e
-        
-    def annihilate_the_trackers(self) -> None:
-        if not self.driver.current_url:
-            return
-        self.driver.delete_all_cookies()
-        # TO-DO: Implement more privacy measures to ensure there are absolutely no possible ways I can be tracked client side
-        # self.driver.execute_script("window.localStorage.clear();")     
+            raise e   
 
     def load_url(self, url=None) -> None:
         self.request_counter += 1
-        self.annihilate_the_trackers()
         if url:
             self.driver.get(url)
         # Stolen code that performs a bunch of checks to verify the page has loaded
@@ -879,6 +870,7 @@ class JobPosting:
             self.log(f"This is attempt {attempt_number} to request the job posting details")
         self.url_element = self.get_web_element(By.TAG_NAME, 'a', self.posting_element)
         self.url_element.click()
+        self.job_scraper.request_counter += 1
         sleep(random.uniform(minimum_jitter, maximum_jitter))
         try:
             self.check_job_posting_is_loaded()
@@ -980,9 +972,12 @@ if __name__ == '__main__':
     scraper = TheJobScraper
     try:
         scraper = TheJobScraper()
+        start_time = time.time()
         scraper.scrape_jobs_from_linkedin()
         scraper.driver.quit()
-        logging.info(f"Execution finished normally with a total of {scraper.request_counter} requests")
+        elapsed_time = time.gmtime(int(time.time()) - int(start_time))
+        formatted_runtime = time.strftime("%H:%M:%S", elapsed_time)
+        logging.info(f"Execution finished normally with a runtime of {formatted_runtime} and a total of {scraper.request_counter} requests")
     except Exception as e:
         logging.info("!!! RAN INTO AN UNRECOVERABLE ERROR !!!")
         current_directory = os.path.dirname(os.path.abspath(__file__))
