@@ -401,6 +401,24 @@ class TheJobScraper:
         return
 
     def scroll_to_the_infinite_bottom(self) -> bool:
+        '''
+        TO-DO: Make this more robust by...
+        When the "See more jobs" button is visible it will have the following tag
+        <button aria-label="See more jobs" class="infinite-scroller__show-more-button infinite-scroller__show-more-button--visible" data-tracking-control-name="infinite-scroller_show-more">
+        When it is not visible it will just be
+        <button aria-label="See more jobs" class="infinite-scroller__show-more-button" data-tracking-control-name="infinite-scroller_show-more">
+        Note the, infinite-scroller__show-more-button--visible, in the class
+        We should adjust our logic so that if the jiggling does not yield success, and, the button is missing that class, then we check the following div
+        This div controls if the "You've viewed all jobs for this search" is visible
+        When it is visible
+        <div class="px-1.5 flex inline-notification text-color-signal-positive see-more-jobs__viewed-all" role="alert" type="success">
+        When it is not
+        <div class="px-1.5 flex inline-notification hidden text-color-signal-positive see-more-jobs__viewed-all" role="alert" type="success">
+        Note the "hidden" in the class
+        So our full logic is
+        if (the find_and_press_see_more_jobs_button fails) and (the button is not visible) and (viewed all jobs for search is visible):
+        return False
+        '''
         results_list = self.get_job_results_list()
         self.log(f"Scrolling to the infinite bottom with {len(results_list)} job postings loaded on the screen")
         # We do not use while true here as a safety precaution against never ending scrolling
