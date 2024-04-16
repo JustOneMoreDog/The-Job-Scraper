@@ -6,7 +6,7 @@ import random
 import re
 import time
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from html import escape
@@ -95,9 +95,29 @@ class TheJobScraper:
     def set_debug_mode(self):
         try:
             output = subprocess.check_output(['git', 'symbolic-ref', '--short', 'HEAD']).decode('utf-8').strip()
-            return output == 'devel'
+            if output == 'devel':
+                self.clean_old_debug_data()
+                return True
         except subprocess.CalledProcessError:
             return False
+    
+    def clean_old_debug_data(self) -> None:
+        logging.info("Checking debug data for old data that needs to be cleaned up")
+        now = datetime.now()
+        cutoff = now - timedelta(days=14)
+        debug_data_directory = os.path.join(self.current_working_directory, "logs/debug_data")
+        for filename in os.listdir(debug_data_directory):
+            if filename == ".keep":
+                continue
+            filepath = os.path.join(debug_data_directory, filename)
+            try:
+                file_datetime_str = filename.split("_")[:6]
+                file_datetime = datetime.strptime("_".join(file_datetime_str), "%m_%d_%Y_%H_%M_%S")
+                if file_datetime < cutoff:
+                    os.remove(filepath)
+                    logging.info(f"Deleted: {filename}")
+            except (ValueError, OSError):
+                pass    
 
     def log(self, message: str) -> None:
         prefix = f"{self.current_search}:{self.current_location}:{self.current_timespan}: "
@@ -494,7 +514,7 @@ class TheJobScraper:
     def save_debug_data(self, name: str, source: bool, screenshot: bool) -> None:
         if not self.debug_mode:
             return
-        filename = str(int(time.time())) + "_" + name
+        filename = datetime.now().strftime("%m_%d_%Y_%H_%M_%S") + "_" + name
         if source:
             filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename + ".html")
             with open(filepath, "w") as f:
@@ -583,11 +603,11 @@ class TheJobScraper:
             self.wait_for_page_to_load()
         http_429_check = self.driver.find_elements(By.XPATH, self.app_config['http_429_xpath'])
         if http_429_check:
-            self.save_debug_data("429", True, True)
+            self.save_debug_data("429_regular", True, True)
             raise TooManyRequestsException("We have been hit with HTTP 429 and so we need to sleep")
-        network_down_message = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Your LinkedIn Network Will Be Back Soon')]")
+        network_down_message = self.driver.find_elements(By.XPATH, self.app_config['linkedin_custom_429'])
         if network_down_message:
-            self.save_debug_data("429", True, True)
+            self.save_debug_data("429_linkedin", True, True)
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def setup_logging(self) -> None:

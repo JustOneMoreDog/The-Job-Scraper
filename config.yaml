@@ -5,6 +5,7 @@ html_folder: "templates"
 window_size: "1920,1080"
 headless: true
 http_429_xpath: "//div[contains(text(), 'HTTP ERROR 429')]"
+linkedin_custom_429: "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'your linkedin network will be back soon')]"
 redirect_checks:
   - "sessionRedirect"
   - "session_redirect"
