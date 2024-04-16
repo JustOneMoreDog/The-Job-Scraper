@@ -39,4 +39,3 @@ company_name_pre_request: "//a[contains(@class, 'hidden-nested-link')]"
 keywords_input_box: "//input[@id='job-search-bar-keywords']"
 location_input_box: "//input[@id='job-search-bar-location']"
 sign_in_form: "//form[@data-js-module-id='d2l-sign-in-form' and not(.//input[contains(@data-tracking-control-name, 'public_jobs')])]"
-
