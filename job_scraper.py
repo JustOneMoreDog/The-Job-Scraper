@@ -121,7 +121,7 @@ class TheJobScraper:
 
     def log(self, message: str) -> None:
         log_timestamp = datetime.now().strftime("[%d/%m/%Y %H-%M-%S]")
-        prefix = f"{self.current_search}:{self.current_location}:{self.current_timespan}:{log_timestamp}: "
+        prefix = f"{log_timestamp}:{self.current_search}:{self.current_location}:{self.current_timespan}: "
         logging.info(f"{prefix} {message}")
 
     def scrape_jobs_from_linkedin(self):
