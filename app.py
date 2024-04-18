@@ -48,7 +48,7 @@ class LogWatcher(FileSystemEventHandler):
 def run_job_scraper(retry: bool = True) -> None:
     global JOB_SCRAPER_RUNNING
     JOB_SCRAPER_RUNNING = True
-    timeout = 14400  # 4 hours
+    timeout = 28800  # 8 hours
     scraper_had_issues = False
     virtual_env_path = os.path.abspath(os.path.join(WORKING_DIR, 'virtualenv/bin/python'))
     job_scraper_path = os.path.abspath(os.path.join(WORKING_DIR, 'job_scraper.py'))
@@ -70,7 +70,7 @@ def run_job_scraper(retry: bool = True) -> None:
         logging.info("Sleeping for one hour and then retrying the job scraper one more time")
         time.sleep(3600)
         run_job_scraper(retry=False)
-    return    
+    return
 
 def kill_the_parents_and_children(parent_pid):
     try:
@@ -160,7 +160,7 @@ def get_job_scrape_dates() -> list:
     for filename in os.listdir(job_scrape_dir):
         if not filename.endswith('.json'):
             continue
-        file_date_str = filename.split('.')[0]  # Get the timestamp part
+        file_date_str = filename.split('.')[0]
         try:
             file_date = datetime.strptime(file_date_str, '%m_%d_%Y_%H_%M')
             all_scrape_dates.append(file_date.strftime('%m-%d-%Y-%H-%M'))
@@ -168,6 +168,10 @@ def get_job_scrape_dates() -> list:
             pass
     scrape_dates = list(set(all_scrape_dates))
     scrape_dates.sort(reverse=True)
+    scrape_dates.append("Past Day")
+    scrape_dates.append("Past Week")
+    scrape_dates.append("Past Month")
+    scrape_dates.append("All Jobs")
     return scrape_dates
 
 def get_job_scrape_filename(date_str: str) -> str:
@@ -178,16 +182,7 @@ def get_job_scrape_filename(date_str: str) -> str:
             json_filename = scrape
     return json_filename
 
-def get_latest_job_scrape_data(latest_date: str) -> list:
-    if latest_date:
-        json_filename = get_job_scrape_filename(latest_date)
-        with open(os.path.join('scrapes', json_filename), 'r') as f:
-            latest_data = json.load(f)
-    else:
-        latest_data = []
-    return latest_data
-
-def load_customizations():
+def load_customizations() -> dict:
     customization_data = {}
     with open('customizations.yaml', 'r') as f:
         customization_data = yaml.safe_load(f)
@@ -199,8 +194,7 @@ def load_customizations():
 def index():
     is_running, running_time, hours_until_next_run = get_scraper_status()
     posting_dates = get_job_scrape_dates()
-    latest_date = posting_dates[0].replace('-', '_') if posting_dates else None
-    latest_data = get_latest_job_scrape_data(latest_date)
+    latest_date = posting_dates[0]
     return render_template(
         'index.html',
         demo_state=DEMO_STATE,
@@ -208,8 +202,7 @@ def index():
         running_time=running_time,
         hours_until_next_run=hours_until_next_run,
         posting_dates=posting_dates,
-        latest_date=latest_date,
-        latest_data=latest_data
+        latest_date=latest_date
     )
 
 @app.route('/get_job_data', methods=['POST']) 
@@ -218,7 +211,7 @@ def get_job_data():
         return jsonify({'error': 'Invalid request method'})
     selected_date = request.form['date']
     job_scrape_dir = 'scrapes'
-    file_date_str = selected_date.replace('-', '_')
+    file_date_str = selected_date.replace('-', '_').replace(' ', '_').lower()
     json_filename = get_job_scrape_filename(file_date_str)
     if not json_filename:
         return jsonify({'error': 'Data for the selected date not found.'})

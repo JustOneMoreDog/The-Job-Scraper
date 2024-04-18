@@ -6,7 +6,7 @@ import random
 import re
 import time
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from html import escape
@@ -133,10 +133,56 @@ class TheJobScraper:
         self.log("Saving new job scrapes for the frontend to ingest")
         self.save_new_job_scrapes()
         self.log("Adding to our new job scrapes to our main job scrape data file")
-        self.save_job_scrape(self.new_job_scrapes + self.all_jobs, "all_jobs.json")
+        self.update_main_job_posting_data()
+    
+    def update_main_job_posting_data(self):
+        self.update_main_job_posting_data_ratings()
+        new_all_jobs = self.new_job_scrapes + self.all_jobs
+        new_all_jobs.sort(key=lambda x: x['rating'], reverse=True)
+        self.save_job_scrape(new_all_jobs, os.path.join(self.current_working_directory, self.app_config['jobs_filepath']))
+        self.update_timespan_based_job_posting_data(new_all_jobs)
+    
+    def update_timespan_based_job_posting_data(self, new_job_postings: list[dict]) -> None:
+        last_day = []
+        last_week = []
+        last_month = []
+        today_date = date.today()
+        yesterday_date = today_date - timedelta(days=1)
+        last_week_date = today_date - timedelta(days=7)
+        last_month_date = today_date - timedelta(days=30)
+        for job_posting in new_job_postings:
+            if not job_posting['posted_time'] or "Excluded Jobs" in job_posting['posted_time']:
+                continue
+            post_date = date.fromisoformat(job_posting['posted_time'])
+            if post_date >= yesterday_date:
+                last_day.append(job_posting)
+            if post_date >= last_week_date:
+                last_week.append(job_posting)
+            if post_date >= last_month_date:
+                last_month.append(job_posting)
+        self.save_job_scrape(last_day, os.path.join(self.current_working_directory, "scrapes/past_day.json"))
+        self.save_job_scrape(last_week, os.path.join(self.current_working_directory, "scrapes/past_week.json"))
+        self.save_job_scrape(last_month, os.path.join(self.current_working_directory, "scrapes/past_month.json"))
+        
+    def update_main_job_posting_data_ratings(self) -> None:
+        updated_all_jobs = []
+        for job in self.all_jobs:
+            if not job['content']:
+                updated_all_jobs.append(job)
+                continue
+            job_content_lower = job['content'].lower()
+            new_keywords = []
+            new_rating = 0
+            for keyword, rating in self.customizations['word_weights'].items():
+                if keyword.lower() in job_content_lower:
+                    new_keywords.append(keyword)
+                    new_rating += rating
+            job['keywords'] = new_keywords
+            job['rating'] = new_rating
+            updated_all_jobs.append(job)
+        self.all_jobs = updated_all_jobs
 
     def save_new_job_scrapes(self) -> None:
-        self.add_blank_spaces_to_good_jobs()
         new_job_scrapes_filename = self.current_date + ".json"
         new_job_scrapes_path = os.path.abspath(os.path.join(self.current_working_directory, "scrapes", new_job_scrapes_filename))
         self.save_job_scrape(self.good_jobs + self.bad_jobs, new_job_scrapes_path)
@@ -151,14 +197,6 @@ class TheJobScraper:
         self.log("Sorting the jobs by their rating")
         self.good_jobs.sort(key=lambda x: x['rating'], reverse=True)
         self.bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
-
-    def add_blank_spaces_to_good_jobs(self) -> None:
-        blank_job = {"applied": False, "posted_time": "", "location": "", "title": "", "company": "", "industry": "", "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
-        for _ in range(0, 4):
-            self.good_jobs.append(blank_job)
-        self.good_jobs.append({
-            "applied": False, "posted_time": "Excluded Jobs", "location": "", "title": "", "company": "", "industry": "", "rating": "", "keywords": "Note: LOCation, COMPany, TITLE", "search": "", "url": "", "content": ""
-        })
 
     def iterate_over_searches(self) -> None:
         searches = list(set(self.customizations['searches']))

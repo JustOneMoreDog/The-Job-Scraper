@@ -1,5 +1,5 @@
 ### DO NOT EDIT UNLESS DEBUGGING ###
-jobs_filepath: "all_jobs.json"
+jobs_filepath: "scrapes/all_jobs.json"
 chrome_driver_executable_path: "chromedriver/chromedriver"
 html_folder: "templates"
 window_size: "1920,1080"
