@@ -6,11 +6,13 @@ import random
 import re
 import time
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from html import escape
 import us
+import math
+import subprocess
 
 import undetected_chromedriver as uc
 import yaml
@@ -23,6 +25,8 @@ from selenium.common import (
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebElement
+from selenium.webdriver.support.ui import WebDriverWait 
+from selenium.webdriver.support import expected_conditions as EC
 from tenacity import (
     RetryError,
     retry,
@@ -35,11 +39,11 @@ from undetected_chromedriver import Chrome, ChromeOptions
 from scraper_utils import js_conditions
 
 # Global configuration for our exponential backoff
-debug = False
 minimum_jitter = int(random.uniform(1, 3))
 maximum_jitter = int(random.uniform(8, 10))
-exponential_jitter_wait = wait_exponential_jitter(5, 7200, 2, random.uniform(minimum_jitter, maximum_jitter))
-small_retry_attempts = stop_after_attempt(3)
+exponential_jitter_wait = wait_exponential_jitter(5, 7200, 3, random.uniform(minimum_jitter, maximum_jitter))
+small_retry_attempts = stop_after_attempt(2)
+medium_retry_attempts = stop_after_attempt(4)
 max_retry_attempts = stop_after_attempt(10)
 retry_if_any_exception = retry_if_exception_type(Exception)
 
@@ -79,6 +83,7 @@ class TheJobScraper:
         self.current_search = ""
         self.current_location = ""
         self.current_timespan = ""
+        self.debug_mode = self.set_debug_mode()
         # For each search in each location we will break out if we go over the threshold that
         # is set by the customizations['minimum_good_results_per_search_per_location']
         # This helps lower the amount of work that needs to happen
@@ -86,9 +91,37 @@ class TheJobScraper:
         self.log("Successfully initialized the job scraper")
         self.log(f"\n-----\nApplication Configuration:\n{self.app_config}\n-----")
         self.log(f"\n-----\nSearch Customizations:\n{self.customizations}\n-----")
+    
+    def set_debug_mode(self):
+        try:
+            output = subprocess.check_output(['git', 'symbolic-ref', '--short', 'HEAD']).decode('utf-8').strip()
+            if output == 'devel':
+                self.clean_old_debug_data()
+                return True
+        except subprocess.CalledProcessError:
+            return False
+    
+    def clean_old_debug_data(self) -> None:
+        logging.info("Checking debug data for old data that needs to be cleaned up")
+        now = datetime.now()
+        cutoff = now - timedelta(days=14)
+        debug_data_directory = os.path.join(self.current_working_directory, "logs/debug_data")
+        for filename in os.listdir(debug_data_directory):
+            if filename == ".keep":
+                continue
+            filepath = os.path.join(debug_data_directory, filename)
+            try:
+                file_datetime_str = filename.split("_")[:6]
+                file_datetime = datetime.strptime("_".join(file_datetime_str), "%m_%d_%Y_%H_%M_%S")
+                if file_datetime < cutoff:
+                    os.remove(filepath)
+                    logging.info(f"Deleted: {filename}")
+            except (ValueError, OSError):
+                pass    
 
     def log(self, message: str) -> None:
-        prefix = f"{self.current_search}:{self.current_location}:{self.current_timespan}: "
+        log_timestamp = datetime.now().strftime("[%d/%m/%Y %H-%M-%S]")
+        prefix = f"{log_timestamp}:{self.current_search}:{self.current_location}:{self.current_timespan}: "
         logging.info(f"{prefix} {message}")
 
     def scrape_jobs_from_linkedin(self):
@@ -100,10 +133,56 @@ class TheJobScraper:
         self.log("Saving new job scrapes for the frontend to ingest")
         self.save_new_job_scrapes()
         self.log("Adding to our new job scrapes to our main job scrape data file")
-        self.save_job_scrape(self.new_job_scrapes + self.all_jobs, "all_jobs.json")
+        self.update_main_job_posting_data()
+    
+    def update_main_job_posting_data(self):
+        self.update_main_job_posting_data_ratings()
+        new_all_jobs = self.new_job_scrapes + self.all_jobs
+        new_all_jobs.sort(key=lambda x: x['rating'], reverse=True)
+        self.save_job_scrape(new_all_jobs, os.path.join(self.current_working_directory, self.app_config['jobs_filepath']))
+        self.update_timespan_based_job_posting_data(new_all_jobs)
+    
+    def update_timespan_based_job_posting_data(self, new_job_postings: list[dict]) -> None:
+        last_day = []
+        last_week = []
+        last_month = []
+        today_date = date.today()
+        yesterday_date = today_date - timedelta(days=1)
+        last_week_date = today_date - timedelta(days=7)
+        last_month_date = today_date - timedelta(days=30)
+        for job_posting in new_job_postings:
+            if not job_posting['posted_time'] or "Excluded Jobs" in job_posting['posted_time']:
+                continue
+            post_date = date.fromisoformat(job_posting['posted_time'])
+            if post_date >= yesterday_date:
+                last_day.append(job_posting)
+            if post_date >= last_week_date:
+                last_week.append(job_posting)
+            if post_date >= last_month_date:
+                last_month.append(job_posting)
+        self.save_job_scrape(last_day, os.path.join(self.current_working_directory, "scrapes/past_day.json"))
+        self.save_job_scrape(last_week, os.path.join(self.current_working_directory, "scrapes/past_week.json"))
+        self.save_job_scrape(last_month, os.path.join(self.current_working_directory, "scrapes/past_month.json"))
+        
+    def update_main_job_posting_data_ratings(self) -> None:
+        updated_all_jobs = []
+        for job in self.all_jobs:
+            if not job['content']:
+                updated_all_jobs.append(job)
+                continue
+            job_content_lower = job['content'].lower()
+            new_keywords = []
+            new_rating = 0
+            for keyword, rating in self.customizations['word_weights'].items():
+                if keyword.lower() in job_content_lower:
+                    new_keywords.append(keyword)
+                    new_rating += rating
+            job['keywords'] = new_keywords
+            job['rating'] = new_rating
+            updated_all_jobs.append(job)
+        self.all_jobs = updated_all_jobs
 
     def save_new_job_scrapes(self) -> None:
-        self.add_blank_spaces_to_good_jobs()
         new_job_scrapes_filename = self.current_date + ".json"
         new_job_scrapes_path = os.path.abspath(os.path.join(self.current_working_directory, "scrapes", new_job_scrapes_filename))
         self.save_job_scrape(self.good_jobs + self.bad_jobs, new_job_scrapes_path)
@@ -118,14 +197,6 @@ class TheJobScraper:
         self.log("Sorting the jobs by their rating")
         self.good_jobs.sort(key=lambda x: x['rating'], reverse=True)
         self.bad_jobs.sort(key=lambda x: x['rating'], reverse=True)
-
-    def add_blank_spaces_to_good_jobs(self) -> None:
-        blank_job = {"applied": False, "posted_time": "", "location": "", "title": "", "company": "", "industry": "", "rating": "", "keywords": "", "url": "", "search": "", "content": ""}
-        for _ in range(0, 4):
-            self.good_jobs.append(blank_job)
-        self.good_jobs.append({
-            "applied": False, "posted_time": "Excluded Jobs", "location": "", "title": "", "company": "", "industry": "", "rating": "", "keywords": "Note: LOCation, COMPany, TITLE", "search": "", "url": "", "content": ""
-        })
 
     def iterate_over_searches(self) -> None:
         searches = list(set(self.customizations['searches']))
@@ -216,14 +287,13 @@ class TheJobScraper:
     def start_a_fresh_chrome_driver(self) -> None:
         if self.driver:
             self.driver.quit()
-            time.sleep(random.uniform(minimum_jitter, maximum_jitter))
+            sleep(random.uniform(minimum_jitter, maximum_jitter))
         self.driver = self.initialize_chrome_driver()
-        self.load_url(self.app_config['starting_url'])
 
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=True
     )
     def input_search_phrase_and_location(self, search: str, location: str) -> None:
@@ -241,7 +311,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=True
     )
     def filter_results_timespan(self, timespan_button_path: str) -> None:
@@ -274,7 +344,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=False
     )
     def select_only_remote_jobs(self) -> None:
@@ -300,7 +370,7 @@ class TheJobScraper:
     @retry(
         retry=retry_if_any_exception,
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=False
     )
     def select_experience_levels(self) -> None:
@@ -347,13 +417,14 @@ class TheJobScraper:
     def get_all_job_postings(self) -> None:
         previous_index = 0
         iteration = 0
-        while self.new_good_job_scrapes_for_search < self.customizations['minimum_good_results_per_search_per_location']:
-            self.annihilate_the_trackers()
+        for _ in range(0, 25):
+            if self.new_good_job_scrapes_for_search >= self.customizations['minimum_good_results_per_search_per_location']:
+                return
             iteration += 1
             if iteration > 1:
                 if self.is_page_sign_in_form():
                     self.log("get_all_job_postings: We have been redirected to the sign in form and we currently do not have a way around this yet")
-                    break
+                    return
             self.log(f"We are on iteration {iteration} with {self.new_good_job_scrapes_for_search} good posts")
             more_jobs_to_load = self.scroll_to_the_infinite_bottom()
             results_list = self.get_job_results_list()
@@ -361,29 +432,97 @@ class TheJobScraper:
             self.get_all_job_posting_objects(previous_index)
             self.log(f"Updating the starting point from {previous_index} to {len(results_list)}")
             previous_index = len(results_list)
-            if not more_jobs_to_load or (previous_index == len(results_list)):
+            if not more_jobs_to_load:
                 self.log("There are no more jobs to load")
-                break
+                self.save_debug_data("more_jobs", True, True)
+                return
+        self.log("We have reached our limited of 25 iterations of getting all job postings")
+        return
 
     def scroll_to_the_infinite_bottom(self) -> bool:
-        # We do not use while true as a safety precaution against never ending scrolling
-        for _ in range(0, 50):
+        results_list = self.get_job_results_list()
+        self.log(f"Scrolling to the infinite bottom with {len(results_list)} job postings loaded on the screen")
+        # We do not use while true here as a safety precaution against never ending scrolling
+        for _ in range(0, 25):
             self.driver.execute_script(self.app_config['scroll_to_bottom_script'])
             self.load_url()
             page_height_script = self.driver.execute_script(self.app_config['page_height_script']) - 1
             total_scrolled_height = self.driver.execute_script(self.app_config['total_scrolled_height'])
             if page_height_script <= total_scrolled_height:
                 try:
-                    more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
-                    self.log("There is a more jobs button and we are going to press it")
-                    more_jobs_button.click()
-                    self.log("Pressed the more jobs button and returning True")
+                    self.find_and_press_see_more_jobs_button(len(results_list))
                     return True
-                except (NoSuchElementException, ElementNotInteractableException):
-                    self.log("At the bottom and do not see the more jobs button and or cannot interact with it")
+                except RetryError:
+                    self.log("Ran out of attempts to find and press the see more jobs button")
                     return False
-        self.log("We have scrolled to the bottom 50 times and have not found the more jobs button so we are breaking out")
+        self.log("We have scrolled to the bottom 25 times and have not found the more jobs button so we are breaking out")
         return True
+    
+    @retry(
+        retry=retry_if_any_exception,
+        wait=exponential_jitter_wait,
+        stop=small_retry_attempts,
+        reraise=False
+    )
+    def find_and_press_see_more_jobs_button(self, previously_loaded_jobs: int) -> None:
+        # This hurt me...
+        attempt_number = self.find_and_press_see_more_jobs_button.retry.statistics['attempt_number']
+        self.log(f"This is attempt {attempt_number} to find and press the see more jobs button")
+        more_jobs_button = self.get_see_more_jobs_button()
+        self.log("See more jobs button exists and is displayed. Clicking it now.")
+        sleep(random.uniform(1, 2))
+        self.click_see_more_jobs_button(more_jobs_button, previously_loaded_jobs)
+
+    def get_see_more_jobs_button(self) -> WebElement:
+        more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'], None, False, True)
+        if not more_jobs_button:
+            message = "Could not find the see more jobs button which is unexpected and may mean that the xpath has changed"
+            self.log(message)
+            raise UnexpectedBehaviorException(message)
+        if not more_jobs_button.is_displayed():
+            for i in range(3):
+                self.log(f"Attempt {i} to get the see more jobs button to display")
+                if self.reached_end_of_results():
+                    self.log("We have viewed all jobs for this search")
+                    return None
+                self.jiggle_up_and_down()
+                more_jobs_button = self.get_web_element(By.XPATH, self.app_config['see_more_jobs_button'])
+                if more_jobs_button.is_displayed():
+                    return more_jobs_button
+            message = "We were unable to get the see more jobs button to display"
+            self.log(message)
+            raise ElementNotInteractableException(message)
+        return more_jobs_button
+    
+    def jiggle_up_and_down(self) -> None:
+        self.log("Jiggling the page up and down for reasons I cannot even begin to explain")
+        random_jiggles = math.ceil(random.uniform(1, 3))
+        for _ in range(random_jiggles):
+            self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_UP)
+            sleep(random.uniform(1, 2))
+        for _ in range(random_jiggles * 3):
+            self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.PAGE_DOWN)
+        sleep(random.uniform(1, 2))
+    
+    def reached_end_of_results(self) -> bool:
+        end_notification = self.get_web_element(By.CLASS_NAME, self.app_config['end_of_results'], None, False, True)
+        if end_notification and end_notification.is_displayed():
+            self.save_debug_data("reached_end_of_results", True, True)
+            return True
+        return False
+
+    def click_see_more_jobs_button(self, more_jobs_button: WebElement, previously_loaded_jobs: int) -> None:
+        for i in range(3):
+            try:
+                more_jobs_button.click()
+                sleep(random.uniform(2, 3))
+                if len(self.get_job_results_list()) > previously_loaded_jobs:
+                    self.log("Successfully loaded more jobs onto the screen after clicking on the button")
+            except Exception as e:
+                if i == 2:
+                    self.save_debug_data("more_jobs_button_press", True, True)
+                    raise e
+                pass
 
     def get_job_results_list(self) -> list:
         all_job_postings_section = self.get_web_element(By.XPATH, self.app_config['job_results_list'])
@@ -399,7 +538,6 @@ class TheJobScraper:
         excluded_jobs = 0
         valid_jobs = 0
         for job_posting_number, job_posting in enumerate(all_job_postings[starting_index:]):
-            self.annihilate_the_trackers()
             job_posting_object = JobPosting(job_posting, job_posting_number, self)
             try:
                 if job_posting_object.is_a_duplicate():
@@ -426,7 +564,6 @@ class TheJobScraper:
                 self.new_good_job_scrapes_for_search += 1
                 valid_jobs += 1
             except Exception as e:
-                self.annihilate_the_trackers()
                 self.log(f"Job posting {job_posting_number} failed with error: {e}")
                 if self.is_page_sign_in_form():
                     self.log("get_all_job_posting_objects: We have been redirected to the sign in form and we currently do not have a way around this yet")
@@ -438,14 +575,22 @@ class TheJobScraper:
     def is_page_sign_in_form(self) -> bool:
         try:
             _ = self.get_web_element(By.XPATH, self.app_config['sign_in_form'])
-            # temp debugging
-            self.driver.save_screenshot("sign_in_form.png")
-            # saving beautiful soup of page to file for debugging
-            with open("sign_in_form.html", "w") as f:
-                f.write(self.driver.page_source)
+            self.save_debug_data("sign_in_form", True, True)
             return True
         except NoSuchElementException:
             return False
+    
+    def save_debug_data(self, name: str, source: bool, screenshot: bool) -> None:
+        if not self.debug_mode:
+            return
+        filename = datetime.now().strftime("%m_%d_%Y_%H_%M_%S") + "_" + name
+        if source:
+            filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename + ".html")
+            with open(filepath, "w") as f:
+                f.write(self.driver.page_source)
+        if screenshot:
+            filepath = os.path.join(self.current_working_directory, "logs/debug_data", filename + ".png")
+            self.driver.save_screenshot(filename=filepath)
 
     def find_and_press_done_button(self) -> None:
         done_buttons = self.driver.find_elements(By.XPATH, self.app_config['done_button'])
@@ -474,18 +619,10 @@ class TheJobScraper:
                 self.log(f"Could not find the '{search_filter}' web element via '{by}'")
             if not is_fatal:
                 return None
-            raise e
-        
-    def annihilate_the_trackers(self) -> None:
-        if not self.driver.current_url:
-            return
-        self.driver.delete_all_cookies()
-        # TO-DO: Implement more privacy measures to ensure there are absolutely no possible ways I can be tracked client side
-        # self.driver.execute_script("window.localStorage.clear();")     
+            raise e   
 
     def load_url(self, url=None) -> None:
         self.request_counter += 1
-        self.annihilate_the_trackers()
         if url:
             self.driver.get(url)
         # Stolen code that performs a bunch of checks to verify the page has loaded
@@ -529,13 +666,17 @@ class TheJobScraper:
     def check_for_http_too_many_requests(self) -> None:
         attempt_number = self.check_for_http_too_many_requests.retry.statistics['attempt_number']
         if attempt_number > 1:
+            self.log("Refreshing page as we got hit with a 429")
+            sleep(random.uniform(minimum_jitter, maximum_jitter))
             self.driver.refresh()
             self.wait_for_page_to_load()
         http_429_check = self.driver.find_elements(By.XPATH, self.app_config['http_429_xpath'])
         if http_429_check:
+            self.save_debug_data("429_regular", True, True)
             raise TooManyRequestsException("We have been hit with HTTP 429 and so we need to sleep")
-        network_down_message = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Your LinkedIn Network Will Be Back Soon')]")
+        network_down_message = self.driver.find_elements(By.XPATH, self.app_config['linkedin_custom_429'])
         if network_down_message:
+            self.save_debug_data("429_linkedin", True, True)
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def setup_logging(self) -> None:
@@ -808,7 +949,7 @@ class JobPosting:
     @retry(
         retry=retry_if_exception_type((TooManyRequestsException, NoSuchElementException)),
         wait=exponential_jitter_wait,
-        stop=small_retry_attempts,
+        stop=medium_retry_attempts,
         reraise=False
     )
     def request_job_posting(self) -> None:
@@ -818,6 +959,7 @@ class JobPosting:
             self.log(f"This is attempt {attempt_number} to request the job posting details")
         self.url_element = self.get_web_element(By.TAG_NAME, 'a', self.posting_element)
         self.url_element.click()
+        self.job_scraper.request_counter += 1
         sleep(random.uniform(minimum_jitter, maximum_jitter))
         try:
             self.check_job_posting_is_loaded()
@@ -919,9 +1061,12 @@ if __name__ == '__main__':
     scraper = TheJobScraper
     try:
         scraper = TheJobScraper()
+        start_time = time.time()
         scraper.scrape_jobs_from_linkedin()
         scraper.driver.quit()
-        logging.info(f"Execution finished normally with a total of {scraper.request_counter} requests")
+        elapsed_time = time.gmtime(int(time.time()) - int(start_time))
+        formatted_runtime = time.strftime("%H:%M:%S", elapsed_time)
+        logging.info(f"Execution finished normally with a runtime of {formatted_runtime} and a total of {scraper.request_counter} requests")
     except Exception as e:
         logging.info("!!! RAN INTO AN UNRECOVERABLE ERROR !!!")
         current_directory = os.path.dirname(os.path.abspath(__file__))
