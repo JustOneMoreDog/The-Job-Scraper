@@ -1,5 +1,7 @@
 # Excluding PyCharm Stuff
 /.idea
+# Excluding VSCode Stuff
+The-Job-Scraper.code-workspace
 # Making sure not to commit our venv
 /virtualenv/*
 !/virtualenv/.keep
