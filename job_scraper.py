@@ -1,20 +1,20 @@
 import json
 import logging
 import logging.handlers
+import math
 import os
 import random
 import re
+import subprocess
 import time
 import urllib.parse
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
+from html import escape
 from time import sleep
 from urllib.parse import parse_qs, urlparse
-from html import escape
-import us
-import math
-import subprocess
 
 import undetected_chromedriver as uc
+import us
 import yaml
 from fake_useragent import UserAgent
 from selenium.common import (
@@ -25,8 +25,8 @@ from selenium.common import (
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebElement
-from selenium.webdriver.support.ui import WebDriverWait 
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from tenacity import (
     RetryError,
     retry,
