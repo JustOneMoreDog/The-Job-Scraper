@@ -680,10 +680,15 @@ class TheJobScraper:
             raise TooManyRequestsException("We have been hit with a network down message and so we need to sleep")
 
     def setup_logging(self) -> None:
-        scraper_logs_directory = os.path.abspath(os.path.join(self.current_working_directory, "logs", "scraper"))
-        log_filename = self.current_date + ".log"
-        log_filepath = os.path.join(scraper_logs_directory, log_filename)
-        logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="w")
+        while True:
+            scraper_logs_directory = os.path.abspath(os.path.join(self.current_working_directory, "logs", "scraper"))
+            log_filename = self.current_date + ".log"
+            log_filepath = os.path.join(scraper_logs_directory, log_filename)
+            if not os.path.exists(log_filepath):
+                logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="w")
+                break
+            time.sleep(60)
+            self.current_date = datetime.now().strftime("%m_%d_%Y_%H_%M")
         logging.info("Logging has been setup for job scraper")
 
     @staticmethod

@@ -129,14 +129,15 @@ def setup_logging():
                 return 0
             return 1
     
-    logs_directory = os.path.abspath(os.path.join(WORKING_DIR, "logs", "flask"))
-    log_filename = datetime.now().strftime("%m_%d_%Y_%H_%M") + ".log"
-    log_filepath = os.path.join(logs_directory, log_filename)
-    if os.path.exists(log_filepath):
-        filemode = "a"
-    else:
-        filemode = "x"
-    logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode=filemode)
+    while True:
+        logs_directory = os.path.abspath(os.path.join(WORKING_DIR, "logs", "flask"))
+        log_filename = datetime.now().strftime("%m_%d_%Y_%H_%M_%S") + ".log"
+        log_filepath = os.path.join(logs_directory, log_filename)
+        if not os.path.exists(log_filepath):
+            logging.basicConfig(filename=log_filepath, level=logging.INFO, filemode="w")
+            break
+        time.sleep(1)
+        continue
     logging.info("Logging has been setup for flask")
 
 def get_scraper_status():
