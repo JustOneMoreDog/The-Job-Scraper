@@ -7,7 +7,6 @@ import time
 from datetime import datetime, timedelta
 from threading import Thread
 from ansi2html import Ansi2HTMLConverter
-
 import psutil
 import yaml
 from apscheduler.executors.pool import ProcessPoolExecutor, ThreadPoolExecutor
@@ -17,12 +16,35 @@ from psutil import AccessDenied, NoSuchProcess, ZombieProcess
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.sql import func
+
 
 DEMO_STATE = False
 DEBUG_MODE = True
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 JOB_SCRAPER_RUNNING = False
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///job_postings.db'
+db = SQLAlchemy(app)
+
+
+class JobPostingDatabase(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    applied = db.Column(db.Boolean)
+    posted_time = db.Column(db.String)
+    title = db.Column(db.String)
+    company = db.Column(db.String)
+    industry = db.Column(db.String)
+    location = db.Column(db.String)
+    rating = db.Column(db.Integer)
+    keywords = db.Column(db.String)
+    search = db.Column(db.String)
+    url = db.Column(db.String, unique=True)
+    content = db.Column(db.Text)
+
+    def __repr__(self):
+        return f'<URL: {self.url}>'
 
 
 class LogWatcher(FileSystemEventHandler):
@@ -70,6 +92,8 @@ def run_job_scraper(retry: bool = True) -> None:
         logging.info("Sleeping for one hour and then retrying the job scraper one more time")
         time.sleep(3600)
         run_job_scraper(retry=False)
+    if not retry and scraper_had_issues:
+        logging.error('JOB SCRAPER FAILED TWICE IN A ROW THIS IS REALLY BAD PLEASE SEE LOGS AND OR JUST PANIC')
     return
 
 def kill_the_parents_and_children(parent_pid):
@@ -268,6 +292,36 @@ def applications():
 @app.route('/statistics')
 def statistics():
     return render_template('statistics.html')
+
+@app.route('/test-db')
+def test_db():
+    job_postings = []
+    with open('scrapes/04_18_2024_05_00.json', 'r') as f:
+        job_postings = json.load(f)
+    for job_data in job_postings:
+        print("Adding the following job")
+        print(json.dumps(job_data, indent=4))
+        job = JobPostingDatabase(
+            applied=job_data.get('Applied'),
+            posted_time=job_data.get('posted_time'),
+            title=job_data.get('title'),
+            company=job_data.get('company'),
+            industry=job_data.get('industry'),
+            location=job_data.get('location'),
+            rating=job_data.get('rating'),
+            keywords=job_data.get('keywords'),
+            search=job_data.get('search'),
+            url=job_data.get('url'),
+            content=job_data.get('content')
+        )
+        db.session.add(job)
+        db.session.commit()
+        print("Added")    
+    job_query_test = JobPostingDatabase.query.first()
+    if job_query_test:
+        return f"Found a job: {job_query_test.title}"
+    else:
+        return "No jobs found"
 
 ### MAIN ###
 
